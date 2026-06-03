@@ -4,8 +4,8 @@ services:
     env: node
     plan: free
     region: oregon
-    buildCommand: npm install --prefix server && ./server/node_modules/.bin/prisma generate --schema=server/prisma/schema.prisma && ./server/node_modules/.bin/prisma db push --schema=server/prisma/schema.prisma && node server/prisma/seed.js
-    startCommand: node server/src/index.js
+    buildCommand: npm install --prefix server && ./server/node_modules/.bin/prisma generate --schema=server/prisma/schema.prisma
+    startCommand: ./server/node_modules/.bin/prisma db push --schema=server/prisma/schema.prisma && node server/prisma/seed.js && node server/src/index.js
     envVars:
       - key: NODE_ENV
         value: production
