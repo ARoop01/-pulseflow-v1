@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Tier 0 — Base User ───────────────────────────────────────────────────────
+// role: "PATIENT" | "DOCTOR"
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String
+  passwordHash String
+  role         String   // PATIENT | DOCTOR
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient      Patient?
+  doctor       Doctor?
+  chatMessages SessionChatMessage[]
+}
+
+// ── Tier 1 — Patient Profile ─────────────────────────────────────────────────
+
+model Patient {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth DateTime?
+  gender      String?
+  bloodType   String?
+
+  intake             PatientMedicalIntake?
+  hereditary         PatientHereditaryCondition[]
+  exposures          PatientOccupationalExposure[]
+  appointments       Appointment[]
+  consultRequests    ConsultRequest[]
+  healthRecords      HealthRecord[]
+  vitals             PatientVitals[]
+  symptomChecks      SymptomCheckSession[]
+  wellnessSessions   WellnessSession[]
+  telehealthSessions TelehealthSession[]
+}
+
+// ── Tier 1 — Doctor Profile ──────────────────────────────────────────────────
+
+model Doctor {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  user                  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty             String
+  qualification         String
+  workplace             String
+  location              String
+  feeInr                Int
+  availableMinutesDaily Int     @default(120)
+  experienceYears       Int
+  rating                Float   @default(5.0)
+  reviewCount           Int     @default(0)
+  isVerified            Boolean @default(false)
+
+  availability        DoctorAvailability[]
+  certifications      DoctorCertification[]
+  appointments        Appointment[]
+  consultRequests     ConsultRequest[]
+  healthRecordsIssued HealthRecord[]        @relation("IssuedByDoctor")
+  telehealthSessions  TelehealthSession[]
+}
+
+// ── Tier 2 — Patient Extensions ──────────────────────────────────────────────
+
+model PatientMedicalIntake {
+  id              String  @id @default(uuid())
+  patientId       String  @unique
+  patient         Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  occupation      String
+  workHoursWeekly Int
+  workExertion    String  // Sedentary | Moderate | Highly Active
+  personalHistory String  @default("")
+}
+
+model PatientHereditaryCondition {
+  id            String  @id @default(uuid())
+  patientId     String
+  patient       Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  conditionName String
+}
+
+model PatientOccupationalExposure {
+  id           String  @id @default(uuid())
+  patientId    String
+  patient      Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  exposureType String  // sun | dust | chemical | noise | cold_heat | screens
+}
+
+// ── Tier 2 — Doctor Extensions ───────────────────────────────────────────────
+
+model DoctorAvailability {
+  id            String  @id @default(uuid())
+  doctorId      String
+  doctor        Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  availableDate String
+  timeSlot      String
+  isBooked      Boolean @default(false)
+
+  @@unique([doctorId, availableDate, timeSlot])
+}
+
+model DoctorCertification {
+  id                 String  @id @default(uuid())
+  doctorId           String
+  doctor             Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  degreeName         String
+  certificateFileUrl String?
+}
+
+// ── Tier 3 — Appointments ────────────────────────────────────────────────────
+// type: "SCHEDULED" | "INSTANT"
+// status: "CONFIRMED" | "COMPLETED" | "CANCELLED"
+
+model Appointment {
+  id               String   @id @default(uuid())
+  confirmationCode String   @unique
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  doctorId         String
+  doctor           Doctor   @relation(fields: [doctorId], references: [id])
+  scheduledDate    String
+  scheduledSlot    String
+  type             String   @default("SCHEDULED")
+  status           String   @default("CONFIRMED")
+  createdAt        DateTime @default(now())
+
+  session TelehealthSession?
+}
+
+// ── Tier 3 — Consult Requests (Rapido) ───────────────────────────────────────
+// status: "PENDING" | "ACCEPTED" | "DECLINED"
+
+model ConsultRequest {
+  id                    String    @id @default(uuid())
+  requestToken          String    @unique
+  patientId             String
+  patient               Patient   @relation(fields: [patientId], references: [id])
+  doctorId              String
+  doctor                Doctor    @relation(fields: [doctorId], references: [id])
+  symptomsSummary       String
+  status                String    @default("PENDING")
+  medicalIntakeSnapshot String?   // JSON stored as string for SQLite
+  createdAt             DateTime  @default(now())
+  respondedAt           DateTime?
+
+  session TelehealthSession?
+}
+
+// ── Tier 4 — Telehealth Sessions ─────────────────────────────────────────────
+// sessionType: "SCHEDULED" | "RAPIDO"
+// status: "ACTIVE" | "ENDED" | "ABANDONED"
+
+model TelehealthSession {
+  id               String   @id @default(uuid())
+  sessionType      String   @default("SCHEDULED")
+  appointmentId    String?  @unique
+  appointment      Appointment?   @relation(fields: [appointmentId], references: [id])
+  consultRequestId String?  @unique
+  consultRequest   ConsultRequest? @relation(fields: [consultRequestId], references: [id])
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  doctorId         String
+  doctor           Doctor   @relation(fields: [doctorId], references: [id])
+  startedAt        DateTime @default(now())
+  endedAt          DateTime?
+  status           String   @default("ACTIVE")
+
+  chatMessages SessionChatMessage[]
+}
+
+// ── Tier 5 — Chat Messages ───────────────────────────────────────────────────
+
+model SessionChatMessage {
+  id          String            @id @default(uuid())
+  sessionId   String
+  session     TelehealthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User              @relation(fields: [senderId], references: [id])
+  senderRole  String            // PATIENT | DOCTOR
+  messageText String
+  sentAt      DateTime          @default(now())
+}
+
+// ── Tier 6 — Health Records ──────────────────────────────────────────────────
+// category: "PRESCRIPTIONS" | "LAB_REPORTS" | "VACCINES"
+// source: "DOCTOR_ISSUED" | "SELF_UPLOADED"
+
+model HealthRecord {
+  id                   String   @id @default(uuid())
+  recordCode           String   @unique
+  patientId            String
+  patient              Patient  @relation(fields: [patientId], references: [id])
+  title                String
+  category             String   @default("PRESCRIPTIONS")
+  authorizedByDoctorId String?
+  authorizedByDoctor   Doctor?  @relation("IssuedByDoctor", fields: [authorizedByDoctorId], references: [id])
+  authorizedByName     String?
+  authorizedDate       String
+  description          String
+  fileUrl              String?
+  source               String   @default("SELF_UPLOADED")
+  createdAt            DateTime @default(now())
+}
+
+// ── Tier 6 — Patient Vitals ──────────────────────────────────────────────────
+
+model PatientVitals {
+  id           String   @id @default(uuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  recordedAt   DateTime @default(now())
+  heartRateBpm Int?
+  systolicBp   Int?
+  diastolicBp  Int?
+  sleepHours   Float?
+  dailySteps   Int?
+}
+
+// ── Tier 6 — Symptom Check Sessions ─────────────────────────────────────────
+
+model SymptomCheckSession {
+  id                    String   @id @default(uuid())
+  patientId             String
+  patient               Patient  @relation(fields: [patientId], references: [id])
+  severity              Int
+  durationDays          Int
+  recommendedDepartment String
+  diagnosisCondition    String
+  diagnosisProbability  Int
+  createdAt             DateTime @default(now())
+
+  items SymptomCheckItem[]
+}
+
+model SymptomCheckItem {
+  id               String              @id @default(uuid())
+  checkSessionId   String
+  session          SymptomCheckSession @relation(fields: [checkSessionId], references: [id], onDelete: Cascade)
+  symptomId        String
+  symptomLabel     String
+  mappedDepartment String
+}
+
+// ── Tier 6 — Wellness Sessions ───────────────────────────────────────────────
+// sessionType: "BREATHING" | "HYDRATION"
+
+model WellnessSession {
+  id          String   @id @default(uuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  sessionType String   // BREATHING | HYDRATION
+  value       Int
+  completedAt DateTime @default(now())
+}
