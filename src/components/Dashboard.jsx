@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function Dashboard({ appointments, setTab, selectDoctorForConsult, currentUser, activeRequest, setActiveRequest, setActiveSession, patientUser }) {
   const [pulseTime, setPulseTime] = useState(72);
-  const [activeMetric, setActiveMetric] = useState('heart');
+  const [activeMetric, setActiveMetric] = useState('bp');
   const [activeDoctorMetric, setActiveDoctorMetric] = useState('consults');
 
   // Simulate subtle heartbeat rate fluctuation for patient mode
@@ -538,20 +538,6 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
   // ================= PATIENT CONSOLE VIEW (DEFAULT) =================
   const vitals = [
     {
-      id: 'heart',
-      title: 'Heart Rate',
-      value: pulseTime,
-      unit: 'bpm',
-      status: 'Normal',
-      statusType: 'success',
-      color: 'hsl(162, 73%, 46%)',
-      icon: (
-        <svg style={{ animation: 'heartbeat 1.2s infinite ease-in-out' }} width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-      )
-    },
-    {
       id: 'bp',
       title: 'Blood Pressure',
       value: '118/76',
@@ -579,37 +565,9 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
         </svg>
       )
     },
-    {
-      id: 'steps',
-      title: 'Daily Steps',
-      value: '8,432',
-      unit: 'steps',
-      status: '84% Goal',
-      statusType: 'warning',
-      color: 'hsl(45, 93%, 47%)',
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 22H6a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3z"/>
-          <path d="M9 10h6M9 14h6"/>
-        </svg>
-      )
-    }
   ];
 
   const chartData = {
-    heart: {
-      points: [
-        { label: 'Mon', y: 150, val: 68 },
-        { label: 'Tue', y: 130, val: 74 },
-        { label: 'Wed', y: 160, val: 65 },
-        { label: 'Thu', y: 110, val: 82 },
-        { label: 'Fri', y: 140, val: 70 },
-        { label: 'Sat', y: 125, val: 73 },
-        { label: 'Sun', y: 145, val: 69 }
-      ],
-      color: 'var(--primary)',
-      gradient: ['rgba(16, 185, 129, 0.3)', 'rgba(16, 185, 129, 0)']
-    },
     bp: {
       points: [
         { label: 'Mon', y: 140, val: 120 },
@@ -636,19 +594,6 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
       color: 'var(--accent)',
       gradient: ['rgba(139, 92, 246, 0.3)', 'rgba(139, 92, 246, 0)']
     },
-    steps: {
-      points: [
-        { label: 'Mon', y: 150, val: 6500 },
-        { label: 'Tue', y: 120, val: 8100 },
-        { label: 'Wed', y: 100, val: 9400 },
-        { label: 'Thu', y: 160, val: 5900 },
-        { label: 'Fri', y: 130, val: 7600 },
-        { label: 'Sat', y: 90, val: 10200 },
-        { label: 'Sun', y: 125, val: 8432 }
-      ],
-      color: 'var(--warning)',
-      gradient: ['rgba(245, 158, 11, 0.3)', 'rgba(245, 158, 11, 0)']
-    }
   };
 
   const selectedData = chartData[activeMetric];
@@ -715,7 +660,7 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
               <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Weekly telemetry tracking for {vitals.find(v => v.id === activeMetric)?.title}</p>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {['heart', 'bp', 'sleep', 'steps'].map(metric => (
+              {['bp', 'sleep'].map(metric => (
                 <button
                   key={metric}
                   onClick={() => setActiveMetric(metric)}

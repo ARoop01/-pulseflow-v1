@@ -64,8 +64,8 @@ export default function App() {
         const records = await api.get('/health-records');
         setLockerFiles(records);
 
-        // Set default doctor user (Dr. Sharma for simulator)
-        const sharma = doctorList.find((d) => d.id === 'dr-sharma');
+        // Set default doctor user (Dr. Sharma for simulator, fallback to first doctor)
+        const sharma = doctorList.find((d) => d.id === 'dr-sharma') || doctorList[0];
         if (sharma) {
           setDoctorUser({
             id: sharma.id,
@@ -439,7 +439,7 @@ export default function App() {
               {tab === 'wellness' && 'Mindfulness Toolkit'}
             </h1>
             <p>
-              {tab === 'dashboard' && (simulatorMode === 'doctor' ? `Welcome back, ${currentUser?.name}. Practice platform telemetry is active.` : `Welcome back, ${currentUser?.name}. Telemetry modules are active.`)}
+              {tab === 'dashboard' && (simulatorMode === 'doctor' ? `Welcome back, ${currentUser?.name || 'Doctor'}. Practice platform telemetry is active.` : `Welcome back, ${currentUser?.name || 'Alex'}. Telemetry modules are active.`)}
               {tab === 'symptoms' && 'Complete your biometric check to generate home care indicators.'}
               {tab === 'scheduler' && 'Book visual consultations with verified medical specialists.'}
               {tab === 'telehealth' && 'High-fidelity simulation suite for telehealth video consulting.'}

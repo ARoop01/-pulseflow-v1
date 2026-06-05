@@ -1,14 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api.js';
 import { getSocket } from '../lib/socket.js';
 
-export default function Scheduler({ addAppointment, filterDept, setFilterDept, doctors, activeRequest, setActiveRequest, setTab, patientUser }) {
+export default function Scheduler({ addAppointment, filterDept, setFilterDept, doctors: doctorsProp, activeRequest, setActiveRequest, setTab, patientUser }) {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [ticketDetails, setTicketDetails] = useState(null);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState('');
+  const [localDoctors, setLocalDoctors] = useState([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+
+  // Self-fetch doctors if the parent prop is empty (e.g. bootstrap failed)
+  useEffect(() => {
+    if (doctorsProp?.length > 0) {
+      setLocalDoctors(doctorsProp);
+    } else {
+      setLoadingDoctors(true);
+      api.get('/doctors')
+        .then(setLocalDoctors)
+        .catch(() => setLocalDoctors([]))
+        .finally(() => setLoadingDoctors(false));
+    }
+  }, [doctorsProp]);
+
+  const doctors = localDoctors;
 
   const handleInstantLiveConsult = async () => {
     try {
@@ -110,6 +127,19 @@ export default function Scheduler({ addAppointment, filterDept, setFilterDept, d
       </div>
 
       {/* Directory Grid */}
+      {loadingDoctors && (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: 32, marginBottom: 12, animation: 'heartbeat 1.5s infinite' }}>💚</div>
+          <p>Loading specialists...</p>
+        </div>
+      )}
+      {!loadingDoctors && filteredDoctors.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🩺</div>
+          <h3 style={{ marginBottom: 8 }}>No specialists found</h3>
+          <p style={{ fontSize: 13 }}>Try selecting a different department or check back later.</p>
+        </div>
+      )}
       <div className="doctor-list-grid" style={{ animation: 'slideUp 0.4s' }}>
         {filteredDoctors.map((doc) => (
           <div key={doc.id} className="glass-card doctor-card">
