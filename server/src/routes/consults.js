@@ -26,7 +26,7 @@ router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
         doctorId,
         symptomsSummary: symptomsSummary || 'Instant consult requested',
         status: 'PENDING',
-        medicalIntakeSnapshot: medicalIntake || {},
+        medicalIntakeSnapshot: medicalIntake ? JSON.stringify(medicalIntake) : null,
       },
     });
 
