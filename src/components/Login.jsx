@@ -116,7 +116,7 @@ export default function Login({ onLogin }) {
 
   const inputStyle = {
     width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border-color)',
-    background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14,
+    background: 'var(--bg-secondary)', color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)', fontSize: 14,
     outline: 'none', boxSizing: 'border-box',
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' };
@@ -203,7 +203,7 @@ export default function Login({ onLogin }) {
         {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 20 }}>{error}</div>}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="alex@example.com" /></div>
-          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="••••••••" /></div>
+          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="Enter your password" /></div>
           <button className="btn-primary" type="submit" disabled={loading} style={{ justifyContent: 'center', marginTop: 8 }}>{loading ? 'Signing in...' : 'Sign In'}</button>
         </form>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, marginTop: 20 }}>
@@ -224,7 +224,7 @@ export default function Login({ onLogin }) {
         {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 20 }}>{error}</div>}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="doctor@hospital.in" /></div>
-          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="••••••••" /></div>
+          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="Enter your password" /></div>
           <button className="btn-primary" type="submit" disabled={loading} style={{ justifyContent: 'center', marginTop: 8, background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>{loading ? 'Signing in...' : 'Sign In'}</button>
         </form>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, marginTop: 20 }}>

@@ -161,7 +161,7 @@ export default function PatientApp({ user, onLogout }) {
             </p>
           </div>
           <div className="header-actions">
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>📅 May 25, 2026</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>📅 {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
           </div>
         </header>
