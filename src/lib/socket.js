@@ -4,7 +4,9 @@ let socket = null;
 
 export function getSocket() {
   if (!socket) {
-    socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
+    const serverUrl = import.meta.env.VITE_API_URL ||
+      (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001');
+    socket = io(serverUrl, {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,

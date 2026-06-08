@@ -10,7 +10,7 @@ export function initSocket(httpServer) {
 
   io = new Server(httpServer, {
     cors: {
-      origin: allowedOrigins,
+      origin: process.env.NODE_ENV === 'production' ? true : allowedOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
     },
