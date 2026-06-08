@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     region: oregon
-    buildCommand: "npm install --prefix server && sed -i 's/sqlite/postgresql/' server/prisma/schema.prisma && DATABASE_URL=postgresql://x:x@localhost/x ./server/node_modules/.bin/prisma generate --schema=server/prisma/schema.prisma"
+    buildCommand: "DATABASE_URL=file:./dummy.db npm install --prefix server && sed -i 's/sqlite/postgresql/' server/prisma/schema.prisma && DATABASE_URL=postgresql://x:x@localhost/x ./server/node_modules/.bin/prisma generate --schema=server/prisma/schema.prisma"
     startCommand: ./server/node_modules/.bin/prisma db push --schema=server/prisma/schema.prisma; node server/prisma/seed.js; node server/src/index.js
     envVars:
       - key: NODE_ENV
