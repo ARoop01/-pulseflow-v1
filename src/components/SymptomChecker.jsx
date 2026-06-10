@@ -7,68 +7,136 @@ export default function SymptomChecker({ setTab, setFilterDept }) {
   const [severity, setSeverity] = useState(5);
   const [duration, setDuration] = useState(3);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [diagResult, setDiagResult] = useState(null);
+  const [error, setError] = useState('');
 
-  // Expanded available symptoms to 20 total cases!
-  const availableSymptoms = [
-    { id: 'fever', label: '🌡️ Fever', dept: 'General Health' },
-    { id: 'headache', label: '🧠 Headache', dept: 'Neurology' },
-    { id: 'cough', label: '💨 Cough', dept: 'General Health' },
-    { id: 'sob', label: '🫁 Dyspnea', dept: 'Cardiology' },
-    { id: 'fatigue', label: '💤 Fatigue', dept: 'General Health' },
-    { id: 'muscle', label: '💪 Muscle Pain', dept: 'General Health' },
-    { id: 'chest', label: '❤️ Chest Tightness', dept: 'Cardiology' },
-    { id: 'throat', label: '🗣️ Sore Throat', dept: 'General Health' },
-    { id: 'dizzy', label: '🌀 Dizziness', dept: 'Neurology' },
-    { id: 'anxiety', label: '💭 Anxiety', dept: 'Psychiatry' },
-    
-    // 10 new symptoms added as requested
-    { id: 'indigestion', label: '🧃 Acidity/Stomach Ache', dept: 'General Health' },
-    { id: 'joint_pain', label: '🦴 Joint Pain/Back Ache', dept: 'General Health' },
-    { id: 'blurry_vision', label: '👁️ Blurry Vision/Sore Eyes', dept: 'General Health' },
-    { id: 'skin_rash', label: '🩹 Skin Rash/Itchiness', dept: 'General Health' },
-    { id: 'insomnia', label: '🛌 Insomnia/Sleep Trouble', dept: 'Psychiatry' },
-    { id: 'acid_reflux', label: '🔥 Acid Reflux/Gerd', dept: 'General Health' },
-    { id: 'migraine', label: '⚡ Migraine Headache', dept: 'Neurology' },
-    { id: 'sneezing', label: '🤧 Runny Nose/Sneezing', dept: 'General Health' },
-    { id: 'palpitations', label: '💓 Heart Palpitations', dept: 'Cardiology' },
-    { id: 'panic_attack', label: '🌪️ Extreme Panic/Fear', dept: 'Psychiatry' }
+  const symptomGroups = [
+    {
+      group: 'General',
+      color: 'var(--primary)',
+      symptoms: [
+        { id: 'fever', label: '🌡️ Fever', dept: 'General Health' },
+        { id: 'cough', label: '💨 Cough', dept: 'General Health' },
+        { id: 'fatigue', label: '💤 Fatigue / Low Energy', dept: 'General Health' },
+        { id: 'body_ache', label: '🤕 Body Ache', dept: 'General Health' },
+        { id: 'throat', label: '🗣️ Sore Throat', dept: 'General Health' },
+        { id: 'sneezing', label: '🤧 Runny Nose / Sneezing', dept: 'General Health' },
+        { id: 'loss_of_appetite', label: '🍽️ Loss of Appetite', dept: 'General Health' },
+        { id: 'night_sweats', label: '🥵 Night Sweats', dept: 'General Health' },
+        { id: 'chills', label: '🥶 Chills / Shivering', dept: 'General Health' },
+      ],
+    },
+    {
+      group: 'Heart & Lungs',
+      color: 'hsl(0, 80%, 55%)',
+      symptoms: [
+        { id: 'chest', label: '❤️ Chest Tightness', dept: 'Cardiology' },
+        { id: 'palpitations', label: '💓 Heart Palpitations', dept: 'Cardiology' },
+        { id: 'sob', label: '🫁 Shortness of Breath', dept: 'Cardiology' },
+        { id: 'wheezing', label: '🌬️ Wheezing', dept: 'Pulmonology' },
+        { id: 'chest_congestion', label: '🤒 Chest Congestion', dept: 'Pulmonology' },
+        { id: 'breathlessness', label: '😮‍💨 Breathlessness on Exertion', dept: 'Pulmonology' },
+      ],
+    },
+    {
+      group: 'Head & Nerves',
+      color: 'hsl(262, 83%, 68%)',
+      symptoms: [
+        { id: 'headache', label: '🧠 Headache', dept: 'Neurology' },
+        { id: 'migraine', label: '⚡ Migraine', dept: 'Neurology' },
+        { id: 'dizzy', label: '🌀 Dizziness', dept: 'Neurology' },
+        { id: 'numbness', label: '🫳 Numbness / Tingling', dept: 'Neurology' },
+      ],
+    },
+    {
+      group: 'Mental Health',
+      color: 'hsl(195, 85%, 41%)',
+      symptoms: [
+        { id: 'anxiety', label: '💭 Anxiety / Stress', dept: 'Psychiatry' },
+        { id: 'insomnia', label: '🛌 Insomnia / Sleep Trouble', dept: 'Psychiatry' },
+        { id: 'panic_attack', label: '🌪️ Panic Attacks', dept: 'Psychiatry' },
+        { id: 'depression', label: '😔 Low Mood / Depression', dept: 'Psychiatry' },
+      ],
+    },
+    {
+      group: 'Digestion',
+      color: 'hsl(38, 92%, 50%)',
+      symptoms: [
+        { id: 'indigestion', label: '🧃 Stomach Ache / Indigestion', dept: 'Gastroenterology' },
+        { id: 'acid_reflux', label: '🔥 Acid Reflux / GERD', dept: 'Gastroenterology' },
+        { id: 'nausea', label: '🤢 Nausea', dept: 'Gastroenterology' },
+        { id: 'vomiting', label: '🤮 Vomiting', dept: 'Gastroenterology' },
+        { id: 'bloating', label: '🫧 Bloating / Gas', dept: 'Gastroenterology' },
+        { id: 'diarrhea', label: '🚽 Diarrhea', dept: 'Gastroenterology' },
+        { id: 'abdominal_cramps', label: '😣 Abdominal Cramps', dept: 'Gastroenterology' },
+      ],
+    },
+    {
+      group: 'Bones & Muscles',
+      color: 'hsl(30, 70%, 45%)',
+      symptoms: [
+        { id: 'joint_pain', label: '🦴 Joint Pain / Back Ache', dept: 'Orthopedics' },
+        { id: 'swollen_joints', label: '🦵 Swollen Joints', dept: 'Orthopedics' },
+        { id: 'bone_pain', label: '💀 Bone Pain', dept: 'Orthopedics' },
+        { id: 'stiffness', label: '🧊 Morning Stiffness', dept: 'Orthopedics' },
+        { id: 'muscle', label: '💪 Muscle Pain / Cramps', dept: 'General Health' },
+      ],
+    },
+    {
+      group: 'Eyes & ENT',
+      color: 'hsl(200, 80%, 45%)',
+      symptoms: [
+        { id: 'blurry_vision', label: '👁️ Blurry Vision', dept: 'Ophthalmology' },
+        { id: 'red_eyes', label: '🔴 Red / Irritated Eyes', dept: 'Ophthalmology' },
+        { id: 'watery_eyes', label: '💧 Watery Eyes', dept: 'Ophthalmology' },
+        { id: 'ear_pain', label: '👂 Ear Pain / Discharge', dept: 'ENT' },
+        { id: 'hearing_loss', label: '🔇 Hearing Loss / Tinnitus', dept: 'ENT' },
+        { id: 'nasal_congestion', label: '👃 Nasal Congestion / Sinusitis', dept: 'ENT' },
+        { id: 'sinus_pressure', label: '🤯 Sinus Pressure', dept: 'ENT' },
+      ],
+    },
+    {
+      group: 'Skin & Hair',
+      color: 'hsl(340, 70%, 50%)',
+      symptoms: [
+        { id: 'skin_rash', label: '🩹 Skin Rash / Itchiness', dept: 'Dermatology' },
+        { id: 'acne', label: '😤 Severe Acne', dept: 'Dermatology' },
+        { id: 'hair_loss', label: '🪮 Hair Loss', dept: 'Dermatology' },
+        { id: 'dry_skin', label: '🏜️ Dry / Flaky Skin', dept: 'Dermatology' },
+      ],
+    },
   ];
 
   const handleToggleSymptom = (symptom) => {
-    setSelectedSymptoms(prev => {
-      if (prev.find(s => s.id === symptom.id)) {
-        return prev.filter(s => s.id !== symptom.id);
-      } else {
-        return [...prev, symptom];
-      }
-    });
+    setSelectedSymptoms(prev =>
+      prev.find(s => s.id === symptom.id)
+        ? prev.filter(s => s.id !== symptom.id)
+        : [...prev, symptom]
+    );
   };
 
-  const handleNextStep = () => {
-    if (step === 1 && selectedSymptoms.length === 0) return;
-    
+  const handleNextStep = async () => {
+    if (step === 1) {
+      if (selectedSymptoms.length === 0) return;
+      setStep(2);
+      return;
+    }
     if (step === 2) {
       setIsAnalyzing(true);
-      setTimeout(async () => {
-        setIsAnalyzing(false);
+      setError('');
+      try {
+        const result = await api.post('/symptom-checks', {
+          symptoms: selectedSymptoms.map(s => ({ id: s.id, label: s.label, dept: s.dept })),
+          severity,
+          duration,
+        });
+        setDiagResult(result);
         setStep(3);
-        // Persist symptom check to backend (fire-and-forget)
-        try {
-          const diagResult = getDiagnostics();
-          await api.post('/symptom-checks', {
-            symptoms: selectedSymptoms.map(s => ({ id: s.id, label: s.label, dept: s.dept })),
-            severity,
-            durationDays: duration,
-            recommendedDepartment: getRecommendedDept(),
-            diagnosisCondition: diagResult.condition,
-            diagnosisProbability: diagResult.prob,
-          });
-        } catch (_) {
-          // non-blocking — UI already shows results
-        }
-      }, 2000);
-    } else {
-      setStep(prev => prev + 1);
+      } catch (err) {
+        setError(err.message || 'Analysis failed. Please try again.');
+      } finally {
+        setIsAnalyzing(false);
+      }
     }
   };
 
@@ -77,279 +145,263 @@ export default function SymptomChecker({ setTab, setFilterDept }) {
     setSeverity(5);
     setDuration(3);
     setStep(1);
+    setDiagResult(null);
+    setError('');
   };
 
-  // Get recommended specialist department based on selected symptoms
-  const getRecommendedDept = () => {
-    if (selectedSymptoms.find(s => s.dept === 'Cardiology')) return 'Cardiology';
-    if (selectedSymptoms.find(s => s.dept === 'Neurology')) return 'Neurology';
-    if (selectedSymptoms.find(s => s.dept === 'Psychiatry')) return 'Psychiatry';
-    if (selectedSymptoms.find(s => s.dept === 'Pediatrics')) return 'Pediatrics';
-    return 'General Health';
+  const strokeCircumference = 2 * Math.PI * 50;
+  const strokeDashoffset = diagResult
+    ? strokeCircumference - (diagResult.prob / 100) * strokeCircumference
+    : strokeCircumference;
+
+  const urgencyConfig = {
+    routine:   { bg: 'rgba(16, 185, 129, 0.1)',  color: 'var(--primary)',       icon: '✅', label: 'Routine'         },
+    urgent:    { bg: 'rgba(245, 158, 11, 0.1)',  color: 'hsl(38, 92%, 50%)',   icon: '⚠️', label: 'Needs Attention' },
+    emergency: { bg: 'rgba(239, 68, 68, 0.1)',   color: 'hsl(0, 80%, 55%)',    icon: '🚨', label: 'Seek Care Now'   },
   };
-
-  const recommendedDept = getRecommendedDept();
-
-  // Custom diagnostic probability outputs including expanded symptom logic
-  const getDiagnostics = () => {
-    const mainSymptom = selectedSymptoms[0]?.id;
-    
-    if (mainSymptom === 'chest' || mainSymptom === 'sob' || mainSymptom === 'palpitations') {
-      return {
-        condition: 'Cardiovascular Assessment Triggered',
-        prob: 78,
-        desc: 'Symptoms like chest tight or heart palpitations suggest localized cardiac stress or mild dyspnea. Early evaluation by an Indian specialist is recommended to monitor blood pressure trends.',
-        advice: 'Avoid physical strain immediately, rest in a comfortable sitting posture, and record your heart rate vitals.'
-      };
-    }
-    if (mainSymptom === 'headache' || mainSymptom === 'dizzy' || mainSymptom === 'migraine') {
-      return {
-        condition: 'Neurological Tension / Migraine Syndrome',
-        prob: 85,
-        desc: 'Typical presentation of neurological fatigue, severe migraine, or neural tension. Elevated severity warrants monitoring sleep habits and tracking neurological metrics.',
-        advice: 'Stay hydrated, dim screen light sources immediately, and rest in a dark, quiet room.'
-      };
-    }
-    if (mainSymptom === 'anxiety' || mainSymptom === 'insomnia' || mainSymptom === 'panic_attack') {
-      return {
-        condition: 'Autonomic Hyperarousal & Stress Response',
-        prob: 84,
-        desc: 'Elevated cognitive anxiety and stress stimulating somatic panic, racing pulse, or sleep disturbances. Practicing guided relaxation lowers metrics.',
-        advice: 'Practice box breathing (4-4-4-4) in our Wellness Hub and log water intake.'
-      };
-    }
-    if (mainSymptom === 'indigestion' || mainSymptom === 'acid_reflux') {
-      return {
-        condition: 'Acute Gastrointestinal Reflux / Dyspepsia',
-        prob: 72,
-        desc: 'Upper digestive tract irritation, high acidity, or stomach pain. Often linked to metabolic baseline levels or food sensitivities.',
-        advice: 'Maintain a bland light diet, hydrate regularly, and avoid lying down flat immediately after meals.'
-      };
-    }
-    if (mainSymptom === 'joint_pain') {
-      return {
-        condition: 'Inflammatory Joint / Back Strain',
-        prob: 65,
-        desc: 'Musculoskeletal stress or inflammation located in major joints. Often aggravated by bad ergonomic posture or physical exertion.',
-        advice: 'Apply warm compress, practice light stretches, and keep moving gently to prevent joint stiffening.'
-      };
-    }
-    if (mainSymptom === 'blurry_vision') {
-      return {
-        condition: 'Ocular Strain / Visual Fatigue',
-        prob: 60,
-        desc: 'Fatigue in ocular muscles or mild dry eye syndrome, highly associated with excessive digital screen exposure.',
-        advice: 'Follow the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds. Rest eyes.'
-      };
-    }
-    if (mainSymptom === 'skin_rash') {
-      return {
-        condition: 'Contact Dermatitis / Urticaria',
-        prob: 68,
-        desc: 'Localized inflammatory response on dermal layers, possibly triggered by environmental factors or soap compounds.',
-        advice: 'Avoid scratching the affected region, keep skin moisturized, and wash with mild cool water.'
-      };
-    }
-    return {
-      condition: 'Acute Viral Syndrome / Coryza',
-      prob: 70,
-      desc: 'Standard viral indicators showing respiratory immune response. Vitals should remain optimal, and recovery is standard with adequate care.',
-      advice: 'Maintain adequate fluid hydration, get physical rest, and track core body temperature indices.'
-    };
-  };
-
-  const diag = getDiagnostics();
-
-  // Donut SVG circumference calculation
-  const strokeCircumference = 2 * Math.PI * 50; // 314.15
-  const strokeDashoffset = strokeCircumference - (diag.prob / 100) * strokeCircumference;
 
   return (
     <div className="checker-container">
       <div className="glass-card" style={{ padding: '40px' }}>
-        
-        {/* Step Indicator Header */}
+
+        {/* Step Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               Step {step} of 3
             </span>
-            <h2 style={{ marginTop: 4 }}>Symptom & Wellness Analyst</h2>
+            <h2 style={{ marginTop: 4 }}>AI Symptom Analyser</h2>
           </div>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>AI-Diagnostic Simulator</span>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            {selectedSymptoms.length > 0
+              ? `${selectedSymptoms.length} symptom${selectedSymptoms.length !== 1 ? 's' : ''} selected`
+              : 'Claude-powered Diagnosis'}
+          </span>
         </div>
 
-        {/* Progress Bar */}
         <div className="progress-bar-container">
-          <div 
-            className="progress-bar-fill" 
-            style={{ width: `${(step / 3) * 100}%` }}
-          ></div>
+          <div className="progress-bar-fill" style={{ width: `${(step / 3) * 100}%` }}></div>
         </div>
 
-        {/* STEP 1: Symptom Selection */}
+        {/* ── STEP 1: Symptom Selection ─────────────────────────────────── */}
         {step === 1 && (
           <div style={{ animation: 'fadeIn 0.3s' }}>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 28, fontSize: 15 }}>
-              Select any primary or secondary symptoms you are currently experiencing to run our wellness matching engine:
+              Select all symptoms you are currently experiencing. Organised by body area for more accurate analysis.
             </p>
 
-            <div className="symptom-tag-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-              {availableSymptoms.map(sym => {
-                const isSelected = selectedSymptoms.find(s => s.id === sym.id);
-                return (
-                  <div
-                    key={sym.id}
-                    className={`symptom-tag ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleToggleSymptom(sym)}
-                    style={{ fontSize: 13, padding: '12px 10px' }}
-                  >
-                    {sym.label}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {symptomGroups.map(group => (
+                <div key={group.group}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 800, color: group.color,
+                    textTransform: 'uppercase', letterSpacing: '0.1em',
+                    marginBottom: 10, borderBottom: `1px solid ${group.color}35`, paddingBottom: 6,
+                  }}>
+                    {group.group}
                   </div>
-                );
-              })}
+                  <div className="symptom-tag-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
+                    {group.symptoms.map(sym => {
+                      const isSelected = selectedSymptoms.find(s => s.id === sym.id);
+                      return (
+                        <div
+                          key={sym.id}
+                          className={`symptom-tag ${isSelected ? 'selected' : ''}`}
+                          onClick={() => handleToggleSymptom(sym)}
+                          style={{ fontSize: 13, padding: '12px 10px' }}
+                        >
+                          {sym.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 40 }}>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                 {selectedSymptoms.length} symptom{selectedSymptoms.length !== 1 ? 's' : ''} selected
               </div>
-              <button 
-                className="btn-primary" 
+              <button
+                className="btn-primary"
                 disabled={selectedSymptoms.length === 0}
                 style={{ opacity: selectedSymptoms.length === 0 ? 0.5 : 1 }}
                 onClick={handleNextStep}
               >
-                Continue Analyzer ➜
+                Continue ➜
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 2: Severity & Context Details */}
+        {/* ── STEP 2: Severity & Context ────────────────────────────────── */}
         {step === 2 && (
           <div style={{ animation: 'fadeIn 0.3s' }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 32, fontSize: 15 }}>
-              Help us understand the intensity and duration of your symptoms to calculate correct wellness indices:
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 28, fontSize: 15 }}>
+              Rate the intensity and duration so the AI can produce an accurate clinical assessment.
             </p>
 
-            {/* Severity Slider */}
+            {/* Selected symptoms recap */}
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 28,
+              padding: 16, background: 'rgba(255,255,255,0.02)',
+              borderRadius: 10, border: '1px solid var(--border-color)',
+            }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', width: '100%', marginBottom: 4 }}>
+                SELECTED SYMPTOMS
+              </span>
+              {selectedSymptoms.map(s => (
+                <span key={s.id} style={{
+                  fontSize: 12, fontWeight: 600, color: 'var(--primary)',
+                  background: 'var(--primary-glow)', padding: '3px 10px', borderRadius: 20,
+                }}>
+                  {s.label}
+                </span>
+              ))}
+            </div>
+
             <div className="severity-slider-container">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: 15 }}>Symptom Severity Intensity</span>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>Symptom Severity</span>
                 <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{severity} / 10</span>
               </div>
-              <input 
-                type="range" 
-                min="1" 
-                max="10" 
-                value={severity}
+              <input
+                type="range" min="1" max="10" value={severity}
                 onChange={(e) => setSeverity(parseInt(e.target.value))}
                 className="slider-custom"
               />
               <div className="severity-labels">
-                <span>Mild (Disturbance)</span>
-                <span>Moderate (Restricting)</span>
-                <span>Severe (Acute Stress)</span>
+                <span>Mild</span>
+                <span>Moderate</span>
+                <span>Severe</span>
               </div>
             </div>
 
-            {/* Duration Input */}
             <div className="form-group" style={{ marginTop: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ fontWeight: 600, fontSize: 15 }}>Symptom Duration (Days)</label>
-                <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--secondary)' }}>{duration} {duration === 1 ? 'Day' : 'Days'}</span>
+                <label style={{ fontWeight: 600, fontSize: 15 }}>Duration</label>
+                <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--secondary)' }}>
+                  {duration} {duration === 1 ? 'Day' : 'Days'}
+                </span>
               </div>
-              <input 
-                type="range" 
-                min="1" 
-                max="14" 
-                value={duration} 
+              <input
+                type="range" min="1" max="14" value={duration}
                 onChange={(e) => setDuration(parseInt(e.target.value))}
                 className="slider-custom"
                 style={{ '--primary': 'var(--secondary)' }}
               />
             </div>
 
-            {/* Action Bar */}
+            {error && (
+              <p style={{ fontSize: 13, color: 'hsl(0, 80%, 55%)', marginTop: 12, textAlign: 'center' }}>{error}</p>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 48 }}>
-              <button className="btn-secondary" onClick={() => setStep(1)}>
-                Back
-              </button>
+              <button className="btn-secondary" onClick={() => setStep(1)}>Back</button>
               <button className="btn-primary" onClick={handleNextStep} disabled={isAnalyzing}>
                 {isAnalyzing ? (
                   <>
-                    <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'wave 1s infinite linear', marginRight: 8 }}></span>
-                    Analyzing Vitals...
+                    <span style={{
+                      display: 'inline-block', width: 14, height: 14,
+                      border: '2px solid white', borderTopColor: 'transparent',
+                      borderRadius: '50%', animation: 'wave 1s infinite linear', marginRight: 8,
+                    }}></span>
+                    AI Analysing...
                   </>
-                ) : (
-                  'Generate Diagnostics'
-                )}
+                ) : 'Generate AI Diagnosis'}
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Complete Analysis Dashboard */}
-        {step === 3 && (
+        {/* ── STEP 3: AI Diagnosis Result ───────────────────────────────── */}
+        {step === 3 && diagResult && (
           <div className="diagnosis-container" style={{ animation: 'fadeIn 0.4s' }}>
-            
-            {/* Donut Chart Probability Card */}
+
+            {/* Status badges */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11, fontWeight: 800, padding: '3px 12px', borderRadius: 20,
+                background: diagResult.aiPowered ? 'rgba(139, 92, 246, 0.12)' : 'rgba(100,100,100,0.08)',
+                color: diagResult.aiPowered ? 'hsl(262, 83%, 68%)' : 'var(--text-muted)',
+                border: `1px solid ${diagResult.aiPowered ? 'hsl(262, 83%, 68%)50' : 'var(--border-color)'}`,
+              }}>
+                {diagResult.aiPowered ? '✦ Claude AI Powered' : '⚙ Rule-based Analysis'}
+              </span>
+              {diagResult.urgencyLevel && (() => {
+                const u = urgencyConfig[diagResult.urgencyLevel] || urgencyConfig.routine;
+                return (
+                  <span style={{
+                    fontSize: 11, fontWeight: 800, padding: '3px 12px', borderRadius: 20,
+                    background: u.bg, color: u.color, border: `1px solid ${u.color}40`,
+                  }}>
+                    {u.icon} {u.label}
+                  </span>
+                );
+              })()}
+            </div>
+
+            {/* Donut + Condition */}
             <div className="diagnosis-donut-card">
               <svg className="donut-chart-svg">
                 <circle cx="60" cy="60" r="50" className="donut-bg" />
-                <circle 
-                  cx="60" 
-                  cy="60" 
-                  r="50" 
+                <circle
+                  cx="60" cy="60" r="50"
                   className="donut-fg"
                   style={{
                     '--dashoffset': strokeDashoffset,
-                    stroke: diag.prob > 80 ? 'var(--accent)' : 'var(--primary)'
+                    stroke: diagResult.prob > 80 ? 'var(--accent)' : 'var(--primary)',
                   }}
                 />
                 <text x="60" y="65" textAnchor="middle" className="donut-text">
-                  {diag.prob}%
+                  {diagResult.prob}%
                 </text>
               </svg>
               <div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Primary Indication Match
                 </span>
-                <h3 style={{ fontSize: 22, color: 'var(--text-primary)', margin: '4px 0 8px 0' }}>{diag.condition}</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
-                  {diag.desc}
+                <h3 style={{ fontSize: 22, color: 'var(--text-primary)', margin: '4px 0 8px 0' }}>
+                  {diagResult.condition}
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
+                  {diagResult.assessment || diagResult.advice}
                 </p>
               </div>
             </div>
 
-            {/* Recommendations & Action Plan */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-md)', padding: 24 }}>
+            {/* Home care */}
+            <div style={{
+              background: 'rgba(255,255,255,0.01)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--border-radius-md)', padding: 24,
+            }}>
               <h4 style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                🟢 Home care guidance recommendation
+                🟢 Home care guidance
               </h4>
               <p style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.5, fontWeight: 500 }}>
-                {diag.advice}
+                {diagResult.advice}
               </p>
             </div>
 
-            {/* Specialist Matching Redirect Card */}
+            {/* Specialist referral */}
             <div className="specialist-match-card">
               <div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Recommended Department Specialist
+                  Recommended Department
                 </span>
                 <h4 style={{ fontSize: 18, color: 'var(--text-primary)', margin: '4px 0 2px 0' }}>
-                  {recommendedDept} Department
+                  {diagResult.recommendedDept}
                 </h4>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                  We matched your vitals with our on-duty {recommendedDept.toLowerCase()} specialists.
+                  AI matched your symptoms to a {diagResult.recommendedDept?.toLowerCase()} specialist.
                 </p>
               </div>
-              <button 
+              <button
                 className="btn-primary"
                 onClick={() => {
-                  setFilterDept(recommendedDept);
+                  setFilterDept(diagResult.recommendedDept);
                   setTab('scheduler');
                 }}
               >
@@ -357,7 +409,6 @@ export default function SymptomChecker({ setTab, setFilterDept }) {
               </button>
             </div>
 
-            {/* Reset Button */}
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
               <button className="btn-secondary" style={{ padding: '10px 24px', fontSize: 13 }} onClick={handleReset}>
                 🔄 Start New Analysis

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../lib/api.js';
 
 export default function Dashboard({ appointments, setTab, selectDoctorForConsult, currentUser, activeRequest, setActiveRequest, setActiveSession, patientUser }) {
   const [pulseTime, setPulseTime] = useState(72);
-  const [activeMetric, setActiveMetric] = useState('bp');
+  const [activeMetric, setActiveMetric] = useState('heartrate');
   const [activeDoctorMetric, setActiveDoctorMetric] = useState('consults');
+  const [vitalsHistory, setVitalsHistory] = useState([]);
+  const [symptomChecks, setSymptomChecks] = useState([]);
 
   // Simulate subtle heartbeat rate fluctuation for patient mode
   useEffect(() => {
@@ -16,6 +19,12 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (currentUser?.role !== 'patient') return;
+    api.get('/vitals').then(v => setVitalsHistory(Array.isArray(v) ? v : [])).catch(() => {});
+    api.get('/symptom-checks').then(s => setSymptomChecks(Array.isArray(s) ? s : [])).catch(() => {});
+  }, [currentUser?.role]);
 
   // Helper to convert availability minutes to text
   const formatAvailability = (mins) => {
@@ -536,67 +545,86 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
   }
 
   // ================= PATIENT CONSOLE VIEW (DEFAULT) =================
-  const vitals = [
+  const latestDiag = symptomChecks[0] || null;
+  const medicines = [];
+  const pendingMeds = medicines.filter(m => !m.done).length;
+
+  const patientCards = [
     {
-      id: 'bp',
-      title: 'Blood Pressure',
-      value: '118/76',
-      unit: 'mmHg',
-      status: 'Optimal',
-      statusType: 'success',
-      color: 'hsl(195, 85%, 41%)',
+      id: 'meds',
+      title: 'Medicine Schedule',
+      value: medicines.length > 0 ? String(medicines.length) : '0',
+      unit: medicines.length > 0 ? 'meds today' : 'prescribed',
+      status: medicines.length > 0
+        ? (pendingMeds > 0 ? `${pendingMeds} pending tonight` : 'All doses taken')
+        : 'No active prescriptions',
+      color: 'hsl(38, 92%, 50%)',
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          <rect x="3" y="3" width="18" height="14" rx="2"/>
+          <line x1="9" y1="21" x2="15" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <polyline points="7 10 9 8 11 12 13 6 15 10 17 10"/>
         </svg>
       )
     },
     {
-      id: 'sleep',
-      title: 'Sleep Quality',
-      value: '8.2',
-      unit: 'hrs',
-      status: 'Deep Rest',
-      statusType: 'success',
-      color: 'hsl(262, 83%, 68%)',
+      id: 'diag',
+      title: 'Latest AI Diagnosis',
+      value: latestDiag ? `${Math.round(latestDiag.diagnosisProbability)}%` : '—',
+      unit: latestDiag ? 'AI match' : '',
+      status: latestDiag?.diagnosisCondition || 'No analysis yet',
+      color: 'hsl(162, 73%, 46%)',
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
         </svg>
       )
     },
   ];
 
+  const toChartPoints = (arr, accessor) => {
+    if (!arr.length) return [];
+    const vals = arr.map(accessor);
+    const validVals = vals.filter(v => v != null);
+    if (!validVals.length) return [];
+    const minV = Math.min(...validVals);
+    const maxV = Math.max(...validVals);
+    const range = maxV - minV || 1;
+    return arr.map((v, i) => ({
+      label: new Date(v.recordedAt).toLocaleDateString('en-US', { weekday: 'short' }),
+      val: accessor(v) ?? '—',
+      y: accessor(v) != null ? Math.round(200 - ((accessor(v) - minV) / range) * 140) : 125,
+    }));
+  };
+  const vitalsChronological = [...vitalsHistory].reverse().slice(-7);
+
   const chartData = {
-    bp: {
-      points: [
-        { label: 'Mon', y: 140, val: 120 },
-        { label: 'Tue', y: 135, val: 118 },
-        { label: 'Wed', y: 145, val: 122 },
-        { label: 'Thu', y: 130, val: 115 },
-        { label: 'Fri', y: 135, val: 119 },
-        { label: 'Sat', y: 125, val: 116 },
-        { label: 'Sun', y: 130, val: 118 }
-      ],
+    heartrate: {
+      points: vitalsChronological.length
+        ? toChartPoints(vitalsChronological, v => v.heartRateBpm)
+        : [
+            { label: 'Mon', y: 155, val: 68 }, { label: 'Tue', y: 120, val: 74 },
+            { label: 'Wed', y: 165, val: 65 }, { label: 'Thu', y: 95, val: 82 },
+            { label: 'Fri', y: 145, val: 70 }, { label: 'Sat', y: 130, val: 73 },
+            { label: 'Sun', y: 150, val: 69 },
+          ],
       color: 'var(--secondary)',
-      gradient: ['rgba(14, 165, 233, 0.3)', 'rgba(14, 165, 233, 0)']
     },
-    sleep: {
-      points: [
-        { label: 'Mon', y: 160, val: 7.2 },
-        { label: 'Tue', y: 140, val: 7.8 },
-        { label: 'Wed', y: 110, val: 8.5 },
-        { label: 'Thu', y: 150, val: 6.9 },
-        { label: 'Fri', y: 120, val: 8.1 },
-        { label: 'Sat', y: 100, val: 8.9 },
-        { label: 'Sun', y: 115, val: 8.2 }
-      ],
-      color: 'var(--accent)',
-      gradient: ['rgba(139, 92, 246, 0.3)', 'rgba(139, 92, 246, 0)']
+    steps: {
+      points: vitalsChronological.length
+        ? toChartPoints(vitalsChronological, v => v.dailySteps)
+        : [
+            { label: 'Mon', y: 160, val: 6500 }, { label: 'Tue', y: 120, val: 8100 },
+            { label: 'Wed', y: 90, val: 9400 }, { label: 'Thu', y: 175, val: 5900 },
+            { label: 'Fri', y: 130, val: 7600 }, { label: 'Sat', y: 60, val: 10200 },
+            { label: 'Sun', y: 100, val: 8432 },
+          ],
+      color: 'var(--primary)',
     },
   };
 
-  const selectedData = chartData[activeMetric];
+  const selectedData = chartData[activeMetric] || chartData.heartrate;
 
   const getSvgPath = (points) => {
     let path = `M 40 ${points[0].y}`;
@@ -617,34 +645,31 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
 
   return (
     <>
-      {/* Vitals Cards Row */}
+      {/* Patient Metric Cards Row */}
       <div className="dashboard-grid">
-        {vitals.map(vital => (
-          <div 
-            key={vital.id}
-            className={`glass-card vital-card ${activeMetric === vital.id ? 'active' : ''}`}
-            style={{ 
-              '--vital-accent': vital.color,
-              borderLeft: `4px solid ${vital.color}`,
-              cursor: 'pointer',
-              transform: activeMetric === vital.id ? 'translateY(-4px)' : 'none',
-              boxShadow: activeMetric === vital.id ? `0 10px 25px -5px ${vital.color}25` : ''
+        {patientCards.map(card => (
+          <div
+            key={card.id}
+            className="glass-card vital-card"
+            style={{
+              '--vital-accent': card.color,
+              borderLeft: `4px solid ${card.color}`,
+              boxShadow: `0 8px 20px -5px ${card.color}15`
             }}
-            onClick={() => setActiveMetric(vital.id)}
           >
             <div className="vital-header">
-              <span className="vital-title">{vital.title}</span>
-              <span className="vital-icon" style={{ color: vital.color }}>{vital.icon}</span>
+              <span className="vital-title">{card.title}</span>
+              <span className="vital-icon" style={{ color: card.color }}>{card.icon}</span>
             </div>
             <div>
               <span className="vital-value">
-                {vital.value}
-                <span className="vital-unit"> {vital.unit}</span>
+                {card.value}
+                <span className="vital-unit"> {card.unit}</span>
               </span>
             </div>
-            <div className="vital-status" style={{ '--status-color': vital.color }}>
-              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: vital.color, animation: 'pulseGlow 2s infinite' }}></span>
-              {vital.status}
+            <div className="vital-status" style={{ '--status-color': card.color }}>
+              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: card.color, animation: 'pulseGlow 2s infinite' }}></span>
+              {card.status}
             </div>
           </div>
         ))}
@@ -657,26 +682,28 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
               <h3>Health Analytics</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Weekly telemetry tracking for {vitals.find(v => v.id === activeMetric)?.title}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                Weekly telemetry — {activeMetric === 'heartrate' ? 'Heart Rate (bpm)' : 'Daily Steps'}
+              </p>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {['bp', 'sleep'].map(metric => (
+              {[{ id: 'heartrate', label: 'HR' }, { id: 'steps', label: 'STEPS' }].map(({ id, label }) => (
                 <button
-                  key={metric}
-                  onClick={() => setActiveMetric(metric)}
+                  key={id}
+                  onClick={() => setActiveMetric(id)}
                   style={{
-                    background: activeMetric === metric ? 'var(--primary)' : 'var(--bg-secondary)',
+                    background: activeMetric === id ? 'var(--primary)' : 'var(--bg-secondary)',
                     border: '1px solid var(--border-color)',
                     borderRadius: 8,
                     padding: '6px 12px',
-                    color: activeMetric === metric ? '#fff' : 'var(--text-secondary)',
+                    color: activeMetric === id ? '#fff' : 'var(--text-secondary)',
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'var(--transition-fast)'
                   }}
                 >
-                  {metric.toUpperCase()}
+                  {label}
                 </button>
               ))}
             </div>
@@ -807,16 +834,46 @@ export default function Dashboard({ appointments, setTab, selectDoctorForConsult
               ))
             )}
 
-            <div className="timeline-item">
-              <div className="timeline-icon" style={{ background: 'var(--secondary-glow)', color: 'var(--secondary)' }}>
-                💊
+            {medicines.map((med, i) => (
+              <div key={`med-${i}`} className="timeline-item">
+                <div className="timeline-icon" style={{ background: med.done ? 'var(--primary-glow)' : 'rgba(245, 158, 11, 0.1)', color: med.done ? 'var(--primary)' : 'var(--warning)' }}>
+                  💊
+                </div>
+                <div className="timeline-content">
+                  <h5>{med.name}</h5>
+                  <p>{med.schedule}</p>
+                  <div className="timeline-time" style={{ color: med.done ? 'var(--primary)' : 'hsl(38, 92%, 50%)' }}>
+                    {med.done ? '✓ Taken' : 'Pending'}
+                  </div>
+                </div>
               </div>
-              <div className="timeline-content">
-                <h5>Daily Prescription Checklist</h5>
-                <p>Metoprolol 50mg (1x Morning) • Atorvastatin 20mg (1x Night)</p>
-                <div className="timeline-time">Next due: Tonight, 9:00 PM</div>
+            ))}
+            {symptomChecks.slice(0, 2).map((sc, i) => (
+              <div key={`sc-${i}`} className="timeline-item">
+                <div className="timeline-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--primary)' }}>
+                  🧬
+                </div>
+                <div className="timeline-content">
+                  <h5>{sc.diagnosisCondition}</h5>
+                  <p>{sc.recommendedDepartment} • {Math.round(sc.diagnosisProbability)}% match</p>
+                  <div className="timeline-time">
+                    {new Date(sc.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
+            {symptomChecks.length === 0 && (
+              <div className="timeline-item">
+                <div className="timeline-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--primary)' }}>
+                  🧬
+                </div>
+                <div className="timeline-content">
+                  <h5>No symptom analyses yet</h5>
+                  <p>Run the AI symptom checker to see your diagnosis history here.</p>
+                  <div className="timeline-time">—</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

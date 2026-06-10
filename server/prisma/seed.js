@@ -5,6 +5,27 @@ const prisma = new PrismaClient();
 
 const AVATAR_BASE = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
 
+// ── Date helpers — consistent format shared with Scheduler.jsx frontend ───────
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatAvailDate(d) {
+  return `${WEEKDAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+}
+
+function computeAvailDates(dayPattern) {
+  const allowedDayNums = dayPattern.map(n => WEEKDAY_NAMES.indexOf(n)).filter(n => n >= 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 14);
+  const results = [];
+  const cursor = new Date(today);
+  while (cursor <= cutoff) {
+    if (allowedDayNums.includes(cursor.getDay())) results.push(formatAvailDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return results;
+}
+
 // ── Doctor avatar map (same paths used by the frontend) ──────────────────────
 const AVATARS = {
   'dr-sharma':   '/src/assets/dr_vance.png',
@@ -16,9 +37,15 @@ const AVATARS = {
   'dr-verma':    '/src/assets/dr_vance.png',
   'dr-krishnan': '/src/assets/dr_rostova.png',
   'dr-divan':    '/src/assets/dr_mercer.png',
+  'dr-desai':    '/src/assets/dr_rostova.png',
+  'dr-kapoor':   '/src/assets/dr_vance.png',
+  'dr-pillai':   '/src/assets/dr_jenkins.png',
+  'dr-iyer':     '/src/assets/dr_mercer.png',
+  'dr-bajaj':    '/src/assets/dr_patel.png',
+  'dr-shah':     '/src/assets/dr_jenkins.png',
 };
 
-// ── Doctor definitions (exact match with App.jsx state) ─────────────────────
+// ── Doctor definitions — dayPattern drives dynamic availability seeding ────────
 const doctorDefs = [
   {
     slug: 'dr-sharma',
@@ -35,7 +62,7 @@ const doctorDefs = [
     rating: 4.9,
     reviews: 184,
     degrees: ['MBBS', 'MD (General Medicine)', 'DM (Cardiology)'],
-    days: ['Mon, May 25', 'Wed, May 27', 'Fri, May 29'],
+    dayPattern: ['Mon', 'Wed', 'Fri'],
     slots: ['09:00 AM', '10:30 AM', '01:00 PM', '02:30 PM', '04:00 PM'],
   },
   {
@@ -53,7 +80,7 @@ const doctorDefs = [
     rating: 4.7,
     reviews: 112,
     degrees: ['MBBS', 'MD (General Medicine)', 'DNB'],
-    days: ['Tue, May 26', 'Thu, May 28'],
+    dayPattern: ['Tue', 'Thu'],
     slots: ['10:00 AM', '11:30 AM', '03:00 PM', '04:30 PM'],
   },
   {
@@ -71,7 +98,7 @@ const doctorDefs = [
     rating: 4.8,
     reviews: 98,
     degrees: ['MBBS', 'MD (General Medicine)', 'DM (Neurology)'],
-    days: ['Mon, May 25', 'Wed, May 27', 'Fri, May 29'],
+    dayPattern: ['Mon', 'Wed', 'Fri'],
     slots: ['09:30 AM', '11:00 AM', '02:00 PM', '03:30 PM'],
   },
   {
@@ -89,7 +116,7 @@ const doctorDefs = [
     rating: 4.6,
     reviews: 74,
     degrees: ['MBBS', 'MD (General Medicine)', 'DM (Neurology)'],
-    days: ['Tue, May 26', 'Thu, May 28'],
+    dayPattern: ['Tue', 'Thu'],
     slots: ['10:30 AM', '12:00 PM', '04:00 PM', '05:30 PM'],
   },
   {
@@ -107,7 +134,7 @@ const doctorDefs = [
     rating: 4.9,
     reviews: 210,
     degrees: ['MBBS', 'MD (Pediatrics)', 'DCH'],
-    days: ['Mon, May 25', 'Tue, May 26', 'Thu, May 28'],
+    dayPattern: ['Mon', 'Tue', 'Thu'],
     slots: ['09:00 AM', '10:30 AM', '11:30 AM', '03:00 PM', '04:30 PM'],
   },
   {
@@ -125,7 +152,7 @@ const doctorDefs = [
     rating: 4.5,
     reviews: 88,
     degrees: ['MBBS', 'DNB', 'DCH'],
-    days: ['Wed, May 27', 'Fri, May 29'],
+    dayPattern: ['Wed', 'Fri'],
     slots: ['10:00 AM', '11:30 AM', '02:30 PM', '04:00 PM'],
   },
   {
@@ -143,7 +170,7 @@ const doctorDefs = [
     rating: 4.7,
     reviews: 145,
     degrees: ['MBBS', 'MD (General Medicine)'],
-    days: ['Mon, May 25', 'Wed, May 27', 'Fri, May 29'],
+    dayPattern: ['Mon', 'Wed', 'Fri'],
     slots: ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
   },
   {
@@ -161,7 +188,7 @@ const doctorDefs = [
     rating: 4.8,
     reviews: 162,
     degrees: ['MBBS', 'MD (General Medicine)', 'DNB'],
-    days: ['Tue, May 26', 'Thu, May 28'],
+    dayPattern: ['Tue', 'Thu'],
     slots: ['09:30 AM', '11:30 AM', '02:30 PM', '03:30 PM', '04:30 PM'],
   },
   {
@@ -179,8 +206,117 @@ const doctorDefs = [
     rating: 4.9,
     reviews: 130,
     degrees: ['MBBS', 'MD (Psychiatry)'],
-    days: ['Mon, May 25', 'Wed, May 27', 'Fri, May 29'],
+    dayPattern: ['Mon', 'Wed', 'Fri'],
     slots: ['10:00 AM', '12:00 PM', '03:00 PM', '05:00 PM'],
+  },
+  // ── New specialty doctors ──────────────────────────────────────────────────
+  {
+    slug: 'dr-desai',
+    name: 'Dr. Kavita Desai',
+    email: 'desai@skinsure.in',
+    phone: '+91 90111 22333',
+    specialty: 'Dermatology',
+    qualification: 'MBBS, MD (Dermatology)',
+    workplace: 'Senior Dermatologist at SkinSure Clinic, Mumbai',
+    location: 'Mumbai, India',
+    feeInr: 1100,
+    availMinutes: 210,
+    exp: 12,
+    rating: 4.8,
+    reviews: 142,
+    degrees: ['MBBS', 'MD (Dermatology)'],
+    dayPattern: ['Mon', 'Tue', 'Thu'],
+    slots: ['10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM'],
+  },
+  {
+    slug: 'dr-kapoor',
+    name: 'Dr. Arun Kapoor',
+    email: 'kapoor@bonecare.in',
+    phone: '+91 89222 33444',
+    specialty: 'Orthopedics',
+    qualification: 'MBBS, MS (Orthopedics)',
+    workplace: 'Senior Orthopaedic Surgeon at BoneCare Hospital, Delhi',
+    location: 'Delhi, India',
+    feeInr: 1600,
+    availMinutes: 240,
+    exp: 20,
+    rating: 4.9,
+    reviews: 218,
+    degrees: ['MBBS', 'MS (Orthopedics)', 'DNB'],
+    dayPattern: ['Tue', 'Wed', 'Fri'],
+    slots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM'],
+  },
+  {
+    slug: 'dr-pillai',
+    name: 'Dr. Meera Pillai',
+    email: 'pillai@entcare.in',
+    phone: '+91 88333 44555',
+    specialty: 'ENT',
+    qualification: 'MBBS, MS (ENT)',
+    workplace: 'ENT Specialist at HearClear Clinic, Kochi',
+    location: 'Kochi, India',
+    feeInr: 900,
+    availMinutes: 180,
+    exp: 9,
+    rating: 4.7,
+    reviews: 96,
+    degrees: ['MBBS', 'MS (ENT)'],
+    dayPattern: ['Mon', 'Wed', 'Sat'],
+    slots: ['09:30 AM', '11:00 AM', '03:00 PM', '04:30 PM'],
+  },
+  {
+    slug: 'dr-iyer',
+    name: 'Dr. Suresh Iyer',
+    email: 'iyer@visionclinic.in',
+    phone: '+91 87444 55666',
+    specialty: 'Ophthalmology',
+    qualification: 'MBBS, MS (Ophthalmology)',
+    workplace: 'Consultant Ophthalmologist at VisionPlus Eye Centre, Bangalore',
+    location: 'Bangalore, India',
+    feeInr: 1050,
+    availMinutes: 200,
+    exp: 14,
+    rating: 4.8,
+    reviews: 178,
+    degrees: ['MBBS', 'MS (Ophthalmology)', 'FRCS'],
+    dayPattern: ['Tue', 'Thu', 'Sat'],
+    slots: ['10:00 AM', '11:30 AM', '02:30 PM', '04:00 PM'],
+  },
+  {
+    slug: 'dr-bajaj',
+    name: 'Dr. Ritu Bajaj',
+    email: 'bajaj@gutcare.in',
+    phone: '+91 86555 66777',
+    specialty: 'Gastroenterology',
+    qualification: 'MBBS, MD, DM (Gastroenterology)',
+    workplace: 'Senior Gastroenterologist at GutCare Institute, Jaipur',
+    location: 'Jaipur, India',
+    feeInr: 1350,
+    availMinutes: 220,
+    exp: 13,
+    rating: 4.7,
+    reviews: 120,
+    degrees: ['MBBS', 'MD (General Medicine)', 'DM (Gastroenterology)'],
+    dayPattern: ['Mon', 'Thu'],
+    slots: ['10:00 AM', '12:00 PM', '03:00 PM', '05:00 PM'],
+  },
+  {
+    slug: 'dr-shah',
+    name: 'Dr. Pranav Shah',
+    email: 'shah@lungcare.in',
+    phone: '+91 85666 77888',
+    specialty: 'Pulmonology',
+    qualification: 'MBBS, MD, DM (Pulmonology)',
+    workplace: 'Consultant Pulmonologist at BreathEasy Clinic, Ahmedabad',
+    location: 'Ahmedabad, India',
+    feeInr: 1250,
+    availMinutes: 200,
+    exp: 11,
+    rating: 4.8,
+    reviews: 104,
+    degrees: ['MBBS', 'MD (General Medicine)', 'DM (Pulmonology)'],
+    dayPattern: ['Wed', 'Fri', 'Sat'],
+    slots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM'],
   },
 ];
 
@@ -286,8 +422,8 @@ async function main() {
     }
   }
 
-  // ── 3. Seed 9 Doctors ─────────────────────────────────────────────────────
-  console.log('👨‍⚕️ Seeding 9 doctors...');
+  // ── 3. Seed 15 Doctors ────────────────────────────────────────────────────
+  console.log('👨‍⚕️ Seeding 15 doctors...');
   const doctorMap = {};
 
   for (const def of doctorDefs) {
@@ -341,13 +477,13 @@ async function main() {
       }
     }
 
-    // Availability slots
-    for (const day of def.days) {
+    // Availability slots — delete stale slots then recreate for next 14 days
+    await prisma.doctorAvailability.deleteMany({ where: { doctorId: doctor.id } });
+    const upcomingDays = computeAvailDates(def.dayPattern);
+    for (const day of upcomingDays) {
       for (const slot of def.slots) {
-        await prisma.doctorAvailability.upsert({
-          where: { doctorId_availableDate_timeSlot: { doctorId: doctor.id, availableDate: day, timeSlot: slot } },
-          update: {},
-          create: { doctorId: doctor.id, availableDate: day, timeSlot: slot, isBooked: false },
+        await prisma.doctorAvailability.create({
+          data: { doctorId: doctor.id, availableDate: day, timeSlot: slot, isBooked: false },
         });
       }
     }
@@ -357,15 +493,20 @@ async function main() {
 
   // ── 4. Seed Pre-existing Appointment PF-491208 ────────────────────────────
   console.log('\n📅 Seeding appointment PF-491208...');
+  // Use the first upcoming Monday for Dr. Sharma (Mon/Wed/Fri pattern)
+  const sharmaUpcoming = computeAvailDates(['Mon', 'Wed', 'Fri']);
+  const apptDate = sharmaUpcoming.find(d => d.startsWith('Mon')) || sharmaUpcoming[0] || 'Mon, Jun 16';
+  const apptSlot = `${apptDate} at 10:30 AM`;
+
   await prisma.appointment.upsert({
     where: { confirmationCode: 'PF-491208' },
-    update: {},
+    update: { scheduledDate: apptDate, scheduledSlot: apptSlot },
     create: {
       confirmationCode: 'PF-491208',
       patientId: alexPatient.id,
       doctorId: 'dr-sharma',
-      scheduledDate: 'Mon, May 25',
-      scheduledSlot: 'Mon, May 25 at 10:30 AM',
+      scheduledDate: apptDate,
+      scheduledSlot: apptSlot,
       type: 'SCHEDULED',
       status: 'CONFIRMED',
     },
@@ -373,7 +514,7 @@ async function main() {
 
   // Mark that slot as booked
   await prisma.doctorAvailability.updateMany({
-    where: { doctorId: 'dr-sharma', availableDate: 'Mon, May 25', timeSlot: '10:30 AM' },
+    where: { doctorId: 'dr-sharma', availableDate: apptDate, timeSlot: '10:30 AM' },
     data: { isBooked: true },
   });
 
@@ -424,7 +565,7 @@ async function main() {
   console.log('\n✅ Seed complete!');
   console.log(`   Patient: alex@pulseflow.in / pulseflow123`);
   console.log(`   Doctor:  sharma@apollo.in  / pulseflow123`);
-  console.log(`   (All 9 doctors share password: pulseflow123)\n`);
+  console.log(`   (All 15 doctors share password: pulseflow123)\n`);
 }
 
 main()

@@ -67,6 +67,7 @@ router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
       condition: diag.condition,
       prob: diag.prob,
       recommendedDept: diag.recommendedDept,
+      assessment: diag.assessment || diag.advice,
       advice: diag.advice,
       urgencyLevel: diag.urgencyLevel,
       aiPowered: !!process.env.ANTHROPIC_API_KEY,

@@ -41,7 +41,11 @@ export type Specialty =
   | 'Pediatrics'
   | 'Psychiatry'
   | 'Dermatology'
-  | 'Orthopedics';
+  | 'Orthopedics'
+  | 'ENT'
+  | 'Ophthalmology'
+  | 'Gastroenterology'
+  | 'Pulmonology';
 
 export interface Doctor {
   id: string;
