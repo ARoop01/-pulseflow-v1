@@ -5,6 +5,13 @@ import prisma from '../lib/prisma.js';
 
 const router = Router();
 
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
 function signToken(user) {
   return jwt.sign(
     { id: user.id, role: user.role, email: user.email },
@@ -102,8 +109,8 @@ router.post('/register', async (req, res) => {
     const token = signToken(result.user);
     const { passwordHash: _, ...safeUser } = result.user;
 
+    res.cookie('token', token, COOKIE_OPTS);
     res.status(201).json({
-      token,
       user: safeUser,
       patientId: result.patientId,
       doctorId: result.doctorId,
@@ -126,7 +133,6 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // Fetch related profile id
     let profileId = null;
     if (user.role === 'PATIENT') {
       const patient = await prisma.patient.findUnique({ where: { userId: user.id } });
@@ -139,11 +145,18 @@ router.post('/login', async (req, res) => {
     const token = signToken(user);
     const { passwordHash: _, ...safeUser } = user;
 
-    res.json({ token, user: safeUser, profileId });
+    res.cookie('token', token, COOKIE_OPTS);
+    res.json({ user: safeUser, profileId });
   } catch (err) {
     console.error('[auth/login]', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/auth/logout
+router.post('/logout', (req, res) => {
+  res.clearCookie('token', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+  res.json({ message: 'Logged out' });
 });
 
 export default router;

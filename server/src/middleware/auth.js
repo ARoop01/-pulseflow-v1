@@ -1,12 +1,16 @@
 import jwt from 'jsonwebtoken';
 
 export function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // Read JWT from HttpOnly cookie (secure) with header fallback for tests/CLI
+  const token = req.cookies?.token || (() => {
+    const h = req.headers.authorization;
+    return h?.startsWith('Bearer ') ? h.split(' ')[1] : null;
+  })();
+
+  if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded; // { id, role, email }

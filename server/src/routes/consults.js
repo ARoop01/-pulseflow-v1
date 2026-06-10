@@ -5,17 +5,15 @@ import prisma from '../lib/prisma.js';
 
 const router = Router();
 
-// POST /api/consult-requests  — Patient dispatches a Rapido live request
+// POST /api/consult-requests
+// Patient dispatches a Rapido live request to a specialty queue
 router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
   try {
-    const { doctorId, symptomsSummary, medicalIntake } = req.body;
-    if (!doctorId) return res.status(400).json({ error: 'doctorId is required' });
+    const { specialty, symptomsSummary, medicalIntake } = req.body;
+    if (!specialty) return res.status(400).json({ error: 'specialty is required' });
 
     const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
-
-    const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
-    if (!doctor) return res.status(404).json({ error: 'Doctor not found' });
 
     const requestToken = uuidv4();
 
@@ -23,7 +21,7 @@ router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
       data: {
         requestToken,
         patientId: patient.id,
-        doctorId,
+        specialty,
         symptomsSummary: symptomsSummary || 'Instant consult requested',
         status: 'PENDING',
         medicalIntakeSnapshot: medicalIntake ? JSON.stringify(medicalIntake) : null,

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import PatientApp from './components/PatientApp';
 import PhysicianApp from './components/PhysicianApp';
-import { clearSession, getStoredUser } from './lib/api.js';
+import { api, clearSession, getStoredUser, saveSession } from './lib/api.js';
 
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
@@ -10,13 +10,25 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'dark');
-    const user = getStoredUser();
-    const token = localStorage.getItem('pf_token');
-    if (user && token) setAuthUser(user);
-    setLoading(false);
+    const cached = getStoredUser();
+    if (!cached) {
+      setLoading(false);
+      return;
+    }
+    // Verify the HttpOnly cookie is still valid
+    api.get('/users/me')
+      .then((data) => setAuthUser(data.user || cached))
+      .catch(() => { clearSession(); })
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleLogout = () => {
+  const handleLogin = (user, profileId) => {
+    saveSession(user, profileId);
+    setAuthUser(user);
+  };
+
+  const handleLogout = async () => {
+    try { await api.post('/auth/logout', {}); } catch {}
     clearSession();
     setAuthUser(null);
   };
@@ -31,7 +43,7 @@ export default function App() {
     </div>
   );
 
-  if (!authUser) return <Login onLogin={setAuthUser} />;
+  if (!authUser) return <Login onLogin={handleLogin} />;
   if (authUser.role === 'DOCTOR') return <PhysicianApp user={authUser} onLogout={handleLogout} />;
   return <PatientApp user={authUser} onLogout={handleLogout} />;
 }

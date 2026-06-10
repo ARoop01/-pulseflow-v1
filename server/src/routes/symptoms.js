@@ -1,35 +1,9 @@
 import { Router } from 'express';
 import { verifyToken, requireRole } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
+import { analyseSymptoms, getDiagnosticsFallback } from '../services/symptomAnalysis.js';
 
 const router = Router();
-
-function getDiagnostics(symptoms) {
-  const mainSymptom = symptoms[0]?.id;
-
-  if (['chest', 'sob', 'palpitations'].includes(mainSymptom)) {
-    return { condition: 'Cardiovascular Assessment Triggered', prob: 78, dept: 'Cardiology', advice: 'Avoid physical strain immediately, rest in a comfortable sitting posture, and record your heart rate vitals.' };
-  }
-  if (['headache', 'dizzy', 'migraine'].includes(mainSymptom)) {
-    return { condition: 'Neurological Tension / Migraine Syndrome', prob: 85, dept: 'Neurology', advice: 'Stay hydrated, dim screen light sources immediately, and rest in a dark, quiet room.' };
-  }
-  if (['anxiety', 'insomnia', 'panic_attack'].includes(mainSymptom)) {
-    return { condition: 'Autonomic Hyperarousal & Stress Response', prob: 84, dept: 'Psychiatry', advice: 'Practice box breathing (4-4-4-4) in our Wellness Hub and log water intake.' };
-  }
-  if (['indigestion', 'acid_reflux'].includes(mainSymptom)) {
-    return { condition: 'Acute Gastrointestinal Reflux / Dyspepsia', prob: 72, dept: 'General Health', advice: 'Maintain a bland light diet, hydrate regularly, and avoid lying down flat immediately after meals.' };
-  }
-  if (mainSymptom === 'joint_pain') {
-    return { condition: 'Inflammatory Joint / Back Strain', prob: 65, dept: 'General Health', advice: 'Apply warm compress, practice light stretches, and keep moving gently.' };
-  }
-  if (mainSymptom === 'blurry_vision') {
-    return { condition: 'Ocular Strain / Visual Fatigue', prob: 60, dept: 'General Health', advice: 'Follow the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds.' };
-  }
-  if (mainSymptom === 'skin_rash') {
-    return { condition: 'Contact Dermatitis / Urticaria', prob: 68, dept: 'General Health', advice: 'Avoid scratching the affected region, keep skin moisturized, and wash with mild cool water.' };
-  }
-  return { condition: 'Acute Viral Syndrome / Coryza', prob: 70, dept: 'General Health', advice: 'Maintain adequate fluid hydration, get physical rest, and track core body temperature indices.' };
-}
 
 // POST /api/symptom-checks
 router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
@@ -37,24 +11,52 @@ router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
     const { symptoms, severity, duration } = req.body;
     if (!symptoms?.length) return res.status(400).json({ error: 'At least one symptom required' });
 
-    const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
+    const patient = await prisma.patient.findUnique({
+      where: { userId: req.user.id },
+      include: {
+        intake: true,
+        hereditary: true,
+        exposures: true,
+      },
+    });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    const diag = getDiagnostics(symptoms);
+    // Build patient context for Claude analysis
+    const patientIntake = patient.intake
+      ? {
+          occupation: patient.intake.occupation,
+          workExertion: patient.intake.workExertion,
+          personalHistory: patient.intake.personalHistory,
+          hereditary: patient.hereditary.map((h) => h.conditionName),
+          exposures: patient.exposures.map((e) => e.exposureType),
+        }
+      : null;
+
+    let diag;
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        diag = await analyseSymptoms(symptoms, severity || 5, duration || 1, patientIntake);
+      } catch (aiErr) {
+        console.warn('[symptoms] Claude API error, using fallback:', aiErr.message);
+        diag = getDiagnosticsFallback(symptoms);
+      }
+    } else {
+      diag = getDiagnosticsFallback(symptoms);
+    }
 
     const session = await prisma.symptomCheckSession.create({
       data: {
         patientId: patient.id,
         severity: severity || 5,
         durationDays: duration || 1,
-        recommendedDepartment: diag.dept,
+        recommendedDepartment: diag.recommendedDept,
         diagnosisCondition: diag.condition,
         diagnosisProbability: diag.prob,
         items: {
           create: symptoms.map((s) => ({
             symptomId: s.id,
             symptomLabel: s.label,
-            mappedDepartment: s.dept || 'General Health',
+            mappedDepartment: s.dept || diag.recommendedDept,
           })),
         },
       },
@@ -64,8 +66,10 @@ router.post('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
       sessionId: session.id,
       condition: diag.condition,
       prob: diag.prob,
-      recommendedDept: diag.dept,
+      recommendedDept: diag.recommendedDept,
       advice: diag.advice,
+      urgencyLevel: diag.urgencyLevel,
+      aiPowered: !!process.env.ANTHROPIC_API_KEY,
     });
   } catch (err) {
     console.error('[symptoms/check]', err);

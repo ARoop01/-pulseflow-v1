@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api, saveSession } from '../lib/api.js';
+import { api } from '../lib/api.js';
 
 const SPECIALTIES = ['General Health', 'Cardiology', 'Neurology', 'Pediatrics', 'Psychiatry', 'Dermatology', 'Orthopedics'];
 const DEGREES = ['MBBS', 'MD (General Medicine)', 'DM (Cardiology)', 'DM (Neurology)', 'MD (Pediatrics)', 'MD (Psychiatry)', 'DNB', 'DCH', 'MS (Surgery)'];
@@ -54,8 +54,7 @@ export default function Login({ onLogin }) {
         );
         return;
       }
-      saveSession(res.token, res.user, res.profileId);
-      onLogin(res.user);
+      onLogin(res.user, res.profileId);
     } catch (err) {
       setError(err.data?.error || err.message);
     } finally {
@@ -72,8 +71,7 @@ export default function Login({ onLogin }) {
         name, email, phone, password, role: 'PATIENT',
         medicalIntake: { occupation: 'Not specified', workHours: 40, workExertion: 'Moderate' },
       });
-      saveSession(res.token, res.user, res.patientId);
-      onLogin(res.user);
+      onLogin(res.user, res.patientId);
     } catch (err) {
       setError(err.data?.error || err.message);
     } finally {
@@ -103,8 +101,7 @@ export default function Login({ onLogin }) {
           degrees: selectedDegrees,
         },
       });
-      saveSession(res.token, res.user, res.doctorId);
-      onLogin(res.user);
+      onLogin(res.user, res.doctorId);
     } catch (err) {
       setError(err.data?.error || err.message);
     } finally {
@@ -152,8 +149,7 @@ export default function Login({ onLogin }) {
             onClick={async () => {
               try {
                 const res = await api.post('/auth/login', { email: 'alex@pulseflow.in', password: 'pulseflow123' });
-                saveSession(res.token, res.user, res.profileId);
-                onLogin(res.user);
+                onLogin(res.user, res.profileId);
               } catch { }
             }}>
             ⚡ Demo: Continue as Alex Rivera (Patient)
@@ -181,8 +177,7 @@ export default function Login({ onLogin }) {
             onClick={async () => {
               try {
                 const res = await api.post('/auth/login', { email: 'sharma@apollo.in', password: 'pulseflow123' });
-                saveSession(res.token, res.user, res.profileId);
-                onLogin(res.user);
+                onLogin(res.user, res.profileId);
               } catch { }
             }}>
             ⚡ Demo: Continue as Dr. Sharma (Physician)

@@ -1,19 +1,6 @@
-// PulseFlow API client — thin fetch wrapper with JWT auth
+// PulseFlow API client — uses HttpOnly cookies for auth (no token in JS)
 
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api';
-
-function getToken() {
-  return localStorage.getItem('pf_token');
-}
-
-function authHeaders(extra = {}) {
-  const token = getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...extra,
-  };
-}
 
 async function handleResponse(res) {
   const data = await res.json().catch(() => ({}));
@@ -21,42 +8,47 @@ async function handleResponse(res) {
   return data;
 }
 
+const FETCH_OPTS = { credentials: 'include' };
+
 export const api = {
   get: (path) =>
-    fetch(`${BASE}${path}`, { headers: authHeaders() }).then(handleResponse),
+    fetch(`${BASE}${path}`, {
+      ...FETCH_OPTS,
+      headers: { 'Content-Type': 'application/json' },
+    }).then(handleResponse),
 
   post: (path, body) =>
     fetch(`${BASE}${path}`, {
+      ...FETCH_OPTS,
       method: 'POST',
-      headers: authHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }).then(handleResponse),
 
   patch: (path, body) =>
     fetch(`${BASE}${path}`, {
+      ...FETCH_OPTS,
       method: 'PATCH',
-      headers: authHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }).then(handleResponse),
 
   postForm: (path, formData) =>
     fetch(`${BASE}${path}`, {
+      ...FETCH_OPTS,
       method: 'POST',
-      headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
       body: formData,
     }).then(handleResponse),
 };
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
+// ── Session helpers (user info only — no token stored in JS) ─────────────────
 
-export function saveSession(token, user, profileId) {
-  localStorage.setItem('pf_token', token);
+export function saveSession(user, profileId) {
   localStorage.setItem('pf_user', JSON.stringify(user));
   localStorage.setItem('pf_profile_id', profileId || '');
 }
 
 export function clearSession() {
-  localStorage.removeItem('pf_token');
   localStorage.removeItem('pf_user');
   localStorage.removeItem('pf_profile_id');
 }
@@ -71,5 +63,5 @@ export function getStoredUser() {
 }
 
 export function isLoggedIn() {
-  return !!getToken();
+  return !!getStoredUser();
 }

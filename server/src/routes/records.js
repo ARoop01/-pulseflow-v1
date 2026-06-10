@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { verifyToken, requireRole } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { upload, persistFile } from '../middleware/upload.js';
 import prisma from '../lib/prisma.js';
 
 const router = Router();
@@ -48,7 +48,7 @@ router.get('/', verifyToken, requireRole('PATIENT'), async (req, res) => {
 });
 
 // POST /api/health-records
-router.post('/', verifyToken, requireRole('PATIENT'), upload.single('file'), async (req, res) => {
+router.post('/', verifyToken, requireRole('PATIENT'), upload.single('file'), persistFile, async (req, res) => {
   try {
     const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
@@ -59,7 +59,7 @@ router.post('/', verifyToken, requireRole('PATIENT'), upload.single('file'), asy
     const categoryMap = { Prescription: 'PRESCRIPTIONS', 'Lab Report': 'LAB_REPORTS', Vaccine: 'VACCINES' };
     const dbCategory = categoryMap[category] || 'PRESCRIPTIONS';
 
-    const fileUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const fileUrl = req.file?.fileUrl ?? null;
 
     const record = await prisma.healthRecord.create({
       data: {

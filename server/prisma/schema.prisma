@@ -64,6 +64,7 @@ model Doctor {
   rating                Float   @default(5.0)
   reviewCount           Int     @default(0)
   isVerified            Boolean @default(false)
+  isOnline              Boolean @default(false)
 
   availability        DoctorAvailability[]
   certifications      DoctorCertification[]
@@ -148,11 +149,12 @@ model ConsultRequest {
   requestToken          String    @unique
   patientId             String
   patient               Patient   @relation(fields: [patientId], references: [id])
-  doctorId              String
-  doctor                Doctor    @relation(fields: [doctorId], references: [id])
+  specialty             String    @default("General Health")
+  doctorId              String?
+  doctor                Doctor?   @relation(fields: [doctorId], references: [id])
   symptomsSummary       String
   status                String    @default("PENDING")
-  medicalIntakeSnapshot String?   // JSON stored as string for SQLite
+  medicalIntakeSnapshot String?
   createdAt             DateTime  @default(now())
   respondedAt           DateTime?
 
