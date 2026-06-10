@@ -2,6 +2,133 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api.js';
 import { getSocket, disconnectSocket } from '../lib/socket.js';
 
+// ── Schedule tab with appointment list + availability management ──────────────
+function ScheduleTab({ appointments, doctorProfile }) {
+  const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const [newDate, setNewDate] = useState('');
+  const [newSlot, setNewSlot] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [showAddSlot, setShowAddSlot] = useState(false);
+
+  const PRESET_SLOTS = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+    '12:00 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM',
+    '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM'];
+
+  // Build next 14 days for the date picker
+  const upcomingDates = (() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 14);
+    const results = [];
+    const cursor = new Date(today);
+    while (cursor <= cutoff) {
+      results.push(`${WEEKDAY_NAMES[cursor.getDay()]}, ${MONTH_NAMES[cursor.getMonth()]} ${cursor.getDate()}`);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return results;
+  })();
+
+  const handleAddSlot = async (e) => {
+    e.preventDefault();
+    if (!newDate || !newSlot) { setSaveMsg('Select both a date and a time slot.'); return; }
+    const doctorId = doctorProfile?.id;
+    if (!doctorId) { setSaveMsg('Doctor profile not loaded yet.'); return; }
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      await api.post(`/doctors/${doctorId}/availability`, { availableDate: newDate, timeSlot: newSlot });
+      setSaveMsg(`Slot added: ${newDate} at ${newSlot}`);
+      setNewDate('');
+      setNewSlot('');
+    } catch (err) {
+      setSaveMsg('Failed to add slot: ' + (err.data?.error || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Add availability slot */}
+      <div className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showAddSlot ? 20 : 0 }}>
+          <h3 style={{ margin: 0 }}>Manage Availability</h3>
+          <button className="btn-secondary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => setShowAddSlot(p => !p)}>
+            {showAddSlot ? 'Hide' : '+ Add Slot'}
+          </button>
+        </div>
+
+        {showAddSlot && (
+          <form onSubmit={handleAddSlot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, display: 'block' }}>Date</label>
+                <select
+                  value={newDate}
+                  onChange={e => setNewDate(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="">Select date…</option>
+                  {upcomingDates.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, display: 'block' }}>Time Slot</label>
+                <select
+                  value={newSlot}
+                  onChange={e => setNewSlot(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="">Select time…</option>
+                  {PRESET_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            {saveMsg && (
+              <p style={{ fontSize: 13, margin: 0, color: saveMsg.startsWith('Failed') ? '#f87171' : 'var(--primary)' }}>{saveMsg}</p>
+            )}
+            <button className="btn-primary" type="submit" disabled={saving} style={{ alignSelf: 'flex-start', padding: '8px 20px' }}>
+              {saving ? 'Adding…' : 'Add Availability Slot'}
+            </button>
+          </form>
+        )}
+      </div>
+
+      {/* Appointments list */}
+      <div className="glass-card">
+        <h3 style={{ marginBottom: 16 }}>Scheduled Appointments</h3>
+        {appointments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>📅</div>
+            <p>No appointments yet. Patients can book once you have availability slots.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {appointments.map(appt => (
+              <div key={appt.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+                  {appt.patient?.avatar ? <img src={appt.patient.avatar} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} alt="" /> : '👤'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{appt.patient?.name || 'Patient'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{appt.slot || appt.date}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{appt.type === 'INSTANT' ? '⚡ Rapido (Instant)' : '📅 Scheduled'}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 12, background: appt.status === 'CONFIRMED' ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.15)', color: appt.status === 'CONFIRMED' ? 'var(--primary)' : 'var(--text-secondary)' }}>{appt.status}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-muted)' }}>{appt.id}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PhysicianApp({ user, onLogout }) {
   const [tab, setTab] = useState('dashboard');
   const [theme, setTheme] = useState('dark');
@@ -353,34 +480,7 @@ export default function PhysicianApp({ user, onLogout }) {
 
         {/* ── SCHEDULE ── */}
         {tab === 'schedule' && (
-          <div>
-            {appointments.length === 0 ? (
-              <div className="glass-card" style={{ textAlign: 'center', padding: '60px 0' }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>📅</div>
-                <h3 style={{ marginBottom: 8 }}>No Scheduled Appointments</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Patients haven't booked appointments with you yet.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {appointments.map(appt => (
-                  <div key={appt.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
-                      {appt.patient?.avatar ? <img src={appt.patient.avatar} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} alt="" /> : '👤'}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{appt.patient?.name || 'Patient'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{appt.slot || appt.date}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{appt.type === 'INSTANT' ? '⚡ Rapido (Instant)' : '📅 Scheduled'}</div>
-                    </div>
-                    <div style={{ display: 'flex', flex: 'column', alignItems: 'flex-end', gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 12, background: appt.status === 'CONFIRMED' ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.15)', color: appt.status === 'CONFIRMED' ? 'var(--primary)' : 'var(--text-secondary)' }}>{appt.status}</span>
-                      <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-muted)' }}>{appt.id}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ScheduleTab appointments={appointments} doctorProfile={doctorProfile} />
         )}
 
         {/* ── ACTIVE SESSION ── */}

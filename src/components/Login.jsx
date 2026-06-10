@@ -4,6 +4,17 @@ import { api } from '../lib/api.js';
 const SPECIALTIES = ['General Health', 'Cardiology', 'Neurology', 'Pediatrics', 'Psychiatry', 'Dermatology', 'Orthopedics'];
 const DEGREES = ['MBBS', 'MD (General Medicine)', 'DM (Cardiology)', 'DM (Neurology)', 'MD (Pediatrics)', 'MD (Psychiatry)', 'DNB', 'DCH', 'MS (Surgery)'];
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Login({ onLogin }) {
   const [mode, setMode] = useState('landing'); // 'landing' | 'patient-login' | 'patient-register' | 'doctor-login' | 'doctor-register'
   const [loading, setLoading] = useState(false);
@@ -12,12 +23,14 @@ export default function Login({ onLogin }) {
   // Login fields
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPw, setShowLoginPw] = useState(false);
 
   // Common register fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showRegPw, setShowRegPw] = useState(false);
 
   // Doctor register extras
   const [specialty, setSpecialty] = useState('General Health');
@@ -30,8 +43,8 @@ export default function Login({ onLogin }) {
 
   const reset = () => {
     setError('');
-    setLoginEmail(''); setLoginPassword('');
-    setName(''); setEmail(''); setPhone(''); setPassword('');
+    setLoginEmail(''); setLoginPassword(''); setShowLoginPw(false);
+    setName(''); setEmail(''); setPhone(''); setPassword(''); setShowRegPw(false);
     setSpecialty('General Health'); setSelectedDegrees([]);
     setWorkplace(''); setLocation(''); setFeeInr(800);
     setCredentialFile(null); setLicenseNumber('');
@@ -39,9 +52,17 @@ export default function Login({ onLogin }) {
 
   const go = (m) => { reset(); setMode(m); };
 
+  const handlePhoneChange = (setter) => (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setter(digits);
+  };
+
+  const validateEmail = (val) => EMAIL_REGEX.test(val);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    if (!validateEmail(loginEmail)) { setError('Please enter a valid email address.'); return; }
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email: loginEmail, password: loginPassword });
@@ -65,6 +86,8 @@ export default function Login({ onLogin }) {
   const handlePatientRegister = async (e) => {
     e.preventDefault();
     setError('');
+    if (!validateEmail(email)) { setError('Please enter a valid email address.'); return; }
+    if (phone.length !== 10) { setError('Phone number must be exactly 10 digits.'); return; }
     setLoading(true);
     try {
       const res = await api.post('/auth/register', {
@@ -82,11 +105,19 @@ export default function Login({ onLogin }) {
   const handleDoctorRegister = async (e) => {
     e.preventDefault();
     setError('');
+    if (!validateEmail(email)) { setError('Please enter a valid email address.'); return; }
+    if (phone.length !== 10) { setError('Phone number must be exactly 10 digits.'); return; }
     if (!credentialFile) { setError('Please upload your degree / medical licence document to proceed.'); return; }
     if (selectedDegrees.length === 0) { setError('Please select at least one qualification degree.'); return; }
     setLoading(true);
     try {
       const docName = name.startsWith('Dr.') ? name : `Dr. ${name}`;
+      let credentialBase64 = null;
+      let credentialMimeType = null;
+      if (credentialFile) {
+        credentialBase64 = await fileToBase64(credentialFile);
+        credentialMimeType = credentialFile.type;
+      }
       const res = await api.post('/auth/register', {
         name: docName, email, phone, password, role: 'DOCTOR',
         doctorProfile: {
@@ -99,6 +130,9 @@ export default function Login({ onLogin }) {
           availMinutes: 120,
           experienceYears: 5,
           degrees: selectedDegrees,
+          credentialBase64,
+          credentialMimeType,
+          credentialFileName: credentialFile?.name,
         },
       });
       onLogin(res.user, res.doctorId);
@@ -117,6 +151,29 @@ export default function Login({ onLogin }) {
     outline: 'none', boxSizing: 'border-box',
   };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' };
+
+  const PasswordInput = ({ value, onChange, placeholder, show, setShow, style = {} }) => (
+    <div style={{ position: 'relative' }}>
+      <input
+        style={{ ...inputStyle, paddingRight: 40, ...style }}
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        required
+        placeholder={placeholder}
+        minLength={8}
+        autoComplete="current-password"
+      />
+      <button
+        type="button"
+        onClick={() => setShow(p => !p)}
+        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 16, padding: '2px 4px', lineHeight: 1 }}
+        title={show ? 'Hide password' : 'Show password'}
+      >
+        {show ? '🙈' : '👁️'}
+      </button>
+    </div>
+  );
 
   // ── LANDING ───────────────────────────────────────────────────────────────
   if (mode === 'landing') return (
@@ -197,8 +254,14 @@ export default function Login({ onLogin }) {
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 28 }}>Sign in to your patient account</p>
         {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 20 }}>{error}</div>}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="alex@example.com" /></div>
-          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="Enter your password" /></div>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input style={inputStyle} type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="alex@example.com" autoComplete="email" />
+          </div>
+          <div>
+            <label style={labelStyle}>Password</label>
+            <PasswordInput value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" show={showLoginPw} setShow={setShowLoginPw} />
+          </div>
           <button className="btn-primary" type="submit" disabled={loading} style={{ justifyContent: 'center', marginTop: 8 }}>{loading ? 'Signing in...' : 'Sign In'}</button>
         </form>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, marginTop: 20 }}>
@@ -218,8 +281,14 @@ export default function Login({ onLogin }) {
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 28 }}>Sign in to your physician account</p>
         {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 20 }}>{error}</div>}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Email</label><input style={inputStyle} type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="doctor@hospital.in" /></div>
-          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required placeholder="Enter your password" /></div>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input style={inputStyle} type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required placeholder="doctor@hospital.in" autoComplete="email" />
+          </div>
+          <div>
+            <label style={labelStyle}>Password</label>
+            <PasswordInput value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" show={showLoginPw} setShow={setShowLoginPw} />
+          </div>
           <button className="btn-primary" type="submit" disabled={loading} style={{ justifyContent: 'center', marginTop: 8, background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>{loading ? 'Signing in...' : 'Sign In'}</button>
         </form>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, marginTop: 20 }}>
@@ -240,9 +309,30 @@ export default function Login({ onLogin }) {
         {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 20 }}>{error}</div>}
         <form onSubmit={handlePatientRegister} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Full Name</label><input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required placeholder="Alex Rivera" /></div>
-          <div><label style={labelStyle}>Email Address</label><input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" /></div>
-          <div><label style={labelStyle}>Phone Number</label><input style={inputStyle} value={phone} onChange={e => setPhone(e.target.value)} required placeholder="+91 98765 43210" /></div>
-          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min. 8 characters" minLength={8} /></div>
+          <div>
+            <label style={labelStyle}>Email Address</label>
+            <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" autoComplete="email" />
+          </div>
+          <div>
+            <label style={labelStyle}>Phone Number <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>(10 digits)</span></label>
+            <input
+              style={inputStyle}
+              value={phone}
+              onChange={handlePhoneChange(setPhone)}
+              required
+              placeholder="9876543210"
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              title="Enter a 10-digit phone number"
+            />
+            {phone.length > 0 && phone.length < 10 && (
+              <p style={{ fontSize: 11, color: 'var(--warning)', margin: '4px 0 0 2px' }}>{10 - phone.length} more digit{10 - phone.length !== 1 ? 's' : ''} required</p>
+            )}
+          </div>
+          <div>
+            <label style={labelStyle}>Password</label>
+            <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters" show={showRegPw} setShow={setShowRegPw} />
+          </div>
           <button className="btn-primary" type="submit" disabled={loading} style={{ justifyContent: 'center', marginTop: 8 }}>{loading ? 'Creating account...' : 'Create Account'}</button>
         </form>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, marginTop: 20 }}>
@@ -267,10 +357,31 @@ export default function Login({ onLogin }) {
         <form onSubmit={handleDoctorRegister} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div><label style={labelStyle}>Full Name</label><input style={inputStyle} value={name} onChange={e => setName(e.target.value)} required placeholder="Rajesh Sharma" /></div>
-            <div><label style={labelStyle}>Phone</label><input style={inputStyle} value={phone} onChange={e => setPhone(e.target.value)} required placeholder="+91 99112 23344" /></div>
+            <div>
+              <label style={labelStyle}>Phone <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>(10 digits)</span></label>
+              <input
+                style={inputStyle}
+                value={phone}
+                onChange={handlePhoneChange(setPhone)}
+                required
+                placeholder="9911223344"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                title="Enter a 10-digit phone number"
+              />
+              {phone.length > 0 && phone.length < 10 && (
+                <p style={{ fontSize: 11, color: 'var(--warning)', margin: '4px 0 0 2px' }}>{10 - phone.length} more digit{10 - phone.length !== 1 ? 's' : ''} required</p>
+              )}
+            </div>
           </div>
-          <div><label style={labelStyle}>Email Address</label><input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="doctor@hospital.in" /></div>
-          <div><label style={labelStyle}>Password</label><input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min. 8 characters" minLength={8} /></div>
+          <div>
+            <label style={labelStyle}>Email Address</label>
+            <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="doctor@hospital.in" autoComplete="email" />
+          </div>
+          <div>
+            <label style={labelStyle}>Password</label>
+            <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters" show={showRegPw} setShow={setShowRegPw} />
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>

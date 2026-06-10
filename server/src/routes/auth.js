@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 import prisma from '../lib/prisma.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
@@ -20,6 +27,41 @@ function signToken(user) {
   );
 }
 
+// Save a base64-encoded credential file to disk; returns the URL path
+async function saveCredentialFile(base64Data, mimeType) {
+  const extMap = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png' };
+  const ext = extMap[mimeType] || '.pdf';
+  const filename = `${uuidv4()}${ext}`;
+  const uploadsDir = path.join(__dirname, '../../../uploads/credentials');
+  await fs.mkdir(uploadsDir, { recursive: true });
+  const buffer = Buffer.from(base64Data, 'base64');
+  await fs.writeFile(path.join(uploadsDir, filename), buffer);
+  return `/uploads/credentials/${filename}`;
+}
+
+// Compute availability dates for the next 14 days (Mon–Fri) with 3 default time slots
+function buildDefaultAvailability(doctorId) {
+  const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const defaultSlots = ['10:00 AM', '12:00 PM', '03:00 PM'];
+  const workdays = new Set([1, 2, 3, 4, 5]); // Mon–Fri
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const rows = [];
+  const cursor = new Date(today);
+  for (let i = 0; i <= 14; i++) {
+    if (workdays.has(cursor.getDay())) {
+      const dateStr = `${WEEKDAY_NAMES[cursor.getDay()]}, ${MONTH_NAMES[cursor.getMonth()]} ${cursor.getDate()}`;
+      for (const slot of defaultSlots) {
+        rows.push({ doctorId, availableDate: dateStr, timeSlot: slot, isBooked: false });
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return rows;
+}
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
@@ -36,6 +78,16 @@ router.post('/register', async (req, res) => {
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
     const passwordHash = await bcrypt.hash(password, 12);
+
+    // Save credential file before transaction if provided
+    let credentialFileUrl = null;
+    if (role === 'DOCTOR' && doctorProfile?.credentialBase64 && doctorProfile?.credentialMimeType) {
+      try {
+        credentialFileUrl = await saveCredentialFile(doctorProfile.credentialBase64, doctorProfile.credentialMimeType);
+      } catch (uploadErr) {
+        console.warn('[auth/register] credential file save failed, continuing:', uploadErr.message);
+      }
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -98,8 +150,18 @@ router.post('/register', async (req, res) => {
 
         if (dp.degrees?.length) {
           await tx.doctorCertification.createMany({
-            data: dp.degrees.map((d) => ({ doctorId: doctor.id, degreeName: d })),
+            data: dp.degrees.map((d) => ({
+              doctorId: doctor.id,
+              degreeName: d,
+              certificateFileUrl: credentialFileUrl,
+            })),
           });
+        }
+
+        // Auto-seed Mon–Fri availability for next 14 days so patients can book immediately
+        const availRows = buildDefaultAvailability(doctor.id);
+        if (availRows.length) {
+          await tx.doctorAvailability.createMany({ data: availRows });
         }
 
         return { user, doctorId: doctor.id };

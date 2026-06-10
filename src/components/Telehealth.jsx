@@ -30,7 +30,7 @@ export default function Telehealth({
     }
 
     // Patient receives session:started (doctor accepted)
-    socket.on('session:started', ({ sessionId, doctorName, doctorAvatar }) => {
+    socket.on('session:started', ({ sessionId, doctorName, doctorAvatar, doctorSpecialty, doctorQualification, doctorWorkplace }) => {
       if (activeRequest) {
         const updatedReq = { ...activeRequest, status: 'accepted' };
         setActiveRequest(updatedReq);
@@ -41,9 +41,9 @@ export default function Telehealth({
             id: activeRequest.doctorId,
             name: doctorName || activeRequest.doctorName,
             avatar: doctorAvatar || activeRequest.doctorAvatar,
-            specialty: 'Cardiology',
-            qualification: 'MBBS, MD, DM (Cardiology)',
-            workplace: 'Apollo Hospital',
+            specialty: doctorSpecialty || activeRequest.doctorSpecialty || 'General Health',
+            qualification: doctorQualification || activeRequest.doctorQualification || '',
+            workplace: doctorWorkplace || activeRequest.doctorWorkplace || '',
           },
           date: 'Today (Live)',
           slot: 'Instant Consultation',
@@ -230,16 +230,18 @@ export default function Telehealth({
   }
 
   // ── Active call layout ────────────────────────────────────────────────────
+  const FALLBACK_PATIENT = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
+  const FALLBACK_DOCTOR = 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=256';
   const isDoctorMode = simulatorMode === 'doctor';
   const mainFeedAvatar = isDoctorMode
-    ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256'
-    : activeSession.doctor?.avatar;
+    ? FALLBACK_PATIENT
+    : (activeSession.doctor?.avatar || FALLBACK_DOCTOR);
   const mainFeedName = isDoctorMode
     ? (activeRequest?.patientName || patientUser?.name || 'Alex Rivera')
-    : activeSession.doctor?.name;
+    : (activeSession.doctor?.name || 'Your Doctor');
   const selfFeedAvatar = isDoctorMode
-    ? activeSession.doctor?.avatar
-    : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256';
+    ? (activeSession.doctor?.avatar || FALLBACK_DOCTOR)
+    : FALLBACK_PATIENT;
 
   return (
     <div className="telehealth-grid" style={{ animation: 'fadeIn 0.5s' }}>

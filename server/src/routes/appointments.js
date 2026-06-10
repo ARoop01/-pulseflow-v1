@@ -74,11 +74,16 @@ router.get('/', verifyToken, async (req, res) => {
 // POST /api/appointments
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { doctorId, scheduledDate, scheduledSlot, type = 'SCHEDULED' } = req.body;
+    const { doctorId, scheduledDate, scheduledSlot, timeSlot, type = 'SCHEDULED' } = req.body;
 
     if (!doctorId || !scheduledDate || !scheduledSlot) {
       return res.status(400).json({ error: 'doctorId, scheduledDate, scheduledSlot required' });
     }
+
+    // timeSlot is the raw time (e.g. "10:30 AM"); scheduledSlot is the display string
+    // ("Mon, Jun 8 at 10:30 AM"). Use timeSlot for DB lookup if provided, otherwise
+    // extract the time portion from scheduledSlot.
+    const slotTime = timeSlot || scheduledSlot.split(' at ').pop();
 
     const patient = await prisma.patient.findUnique({ where: { userId: req.user.id } });
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
@@ -86,7 +91,7 @@ router.post('/', verifyToken, async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       // Find and lock the slot
       const slot = await tx.doctorAvailability.findFirst({
-        where: { doctorId, availableDate: scheduledDate, timeSlot: scheduledSlot, isBooked: false },
+        where: { doctorId, availableDate: scheduledDate, timeSlot: slotTime, isBooked: false },
       });
 
       if (!slot) {

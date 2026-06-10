@@ -102,6 +102,12 @@ export function initSocket(httpServer) {
           io.to(`doctor:${doc.id}`).emit('consult:taken', { token });
         });
 
+        // Fetch doctor details to include in session:started event
+        const doctor = await prisma.doctor.findUnique({
+          where: { id: doctorId },
+          include: { user: { select: { name: true, avatarUrl: true } } },
+        });
+
         const session = await prisma.telehealthSession.create({
           data: {
             sessionType: 'RAPIDO',
@@ -114,8 +120,11 @@ export function initSocket(httpServer) {
 
         io.to(token).emit('session:started', {
           sessionId: session.id,
-          doctorName,
-          doctorAvatar,
+          doctorName: doctorName || doctor?.user?.name,
+          doctorAvatar: doctorAvatar || doctor?.user?.avatarUrl,
+          doctorSpecialty: doctor?.specialty,
+          doctorQualification: doctor?.qualification,
+          doctorWorkplace: doctor?.workplace,
         });
 
         console.log(`[Rapido] Session ${session.id} started with Dr. ${doctorName} | token: ${token}`);

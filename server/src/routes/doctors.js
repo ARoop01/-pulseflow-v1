@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
       rating: d.rating,
       reviews: d.reviewCount,
       isVerified: d.isVerified,
-      certifications: d.certifications.map((c) => c.degreeName),
+      certifications: d.certifications.map((c) => ({ name: c.degreeName, fileUrl: c.certificateFileUrl || null })),
       // Group availability into days/slots for frontend compatibility
       days: [...new Set(d.availability.map((a) => a.availableDate))],
       slots: [...new Set(d.availability.map((a) => a.timeSlot))],
@@ -86,7 +86,7 @@ router.get('/:id', async (req, res) => {
       rating: doctor.rating,
       reviews: doctor.reviewCount,
       isVerified: doctor.isVerified,
-      certifications: doctor.certifications.map((c) => c.degreeName),
+      certifications: doctor.certifications.map((c) => ({ name: c.degreeName, fileUrl: c.certificateFileUrl || null })),
       days: [...new Set(doctor.availability.map((a) => a.availableDate))],
       slots: [...new Set(doctor.availability.map((a) => a.timeSlot))],
       availability: doctor.availability,

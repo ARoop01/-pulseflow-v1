@@ -22,6 +22,10 @@ export default function PatientApp({ user, onLogout }) {
   const [prescriptionReceipt, setPrescriptionReceipt] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Profile state
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -85,6 +89,24 @@ export default function PatientApp({ user, onLogout }) {
     setActiveRequest(null);
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setProfileSaving(true);
+    setProfileMsg('');
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const res = await api.postForm('/users/avatar', formData);
+      setPatientUser(prev => ({ ...prev, avatar: res.avatarUrl }));
+      setProfileMsg('Photo updated successfully.');
+    } catch (err) {
+      setProfileMsg('Upload failed: ' + (err.data?.error || err.message));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'symptoms', label: 'Symptom Analyst', icon: '🩺' },
@@ -92,6 +114,7 @@ export default function PatientApp({ user, onLogout }) {
     { id: 'telehealth', label: 'Video Booth', icon: '📹' },
     { id: 'locker', label: 'Health Locker', icon: '🗄️' },
     { id: 'wellness', label: 'Wellness Hub', icon: '💚' },
+    { id: 'profile', label: 'My Profile', icon: '👤' },
   ];
 
   const displayUser = patientUser || { name: user.name, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256', medicalIntake: null };
@@ -150,6 +173,7 @@ export default function PatientApp({ user, onLogout }) {
               {tab === 'telehealth' && 'Simulated Video Booth'}
               {tab === 'locker' && 'Secure Health Locker'}
               {tab === 'wellness' && 'Mindfulness Toolkit'}
+              {tab === 'profile' && 'My Profile'}
             </h1>
             <p>
               {tab === 'dashboard' && `Welcome back, ${displayUser.name}. Telemetry modules are active.`}
@@ -158,6 +182,7 @@ export default function PatientApp({ user, onLogout }) {
               {tab === 'telehealth' && 'High-fidelity simulation suite for telehealth video consulting.'}
               {tab === 'locker' && 'Manage your secure medical records cabinet and prescriptions.'}
               {tab === 'wellness' && 'Practice restorative box breathing and track daily hydration.'}
+              {tab === 'profile' && 'Manage your account information and profile photo.'}
             </p>
           </div>
           <div className="header-actions">
@@ -172,6 +197,60 @@ export default function PatientApp({ user, onLogout }) {
         {tab === 'telehealth' && <Telehealth activeSession={activeSession} endSession={handleEndTelehealthCall} setTab={setTab} simulatorMode="patient" activeRequest={activeRequest} setActiveRequest={setActiveRequest} setActiveSession={setActiveSession} patientUser={patientUser} doctorUser={null} />}
         {tab === 'locker' && <HealthLocker lockerFiles={lockerFiles} addLockerFile={addLockerFile} />}
         {tab === 'wellness' && <WellnessToolkit />}
+
+        {/* ── PROFILE TAB ── */}
+        {tab === 'profile' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
+            <div className="glass-card">
+              {/* Avatar section */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28 }}>
+                <div style={{ position: 'relative' }}>
+                  <img
+                    src={displayUser.avatar}
+                    alt={displayUser.name}
+                    style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--primary)' }}
+                  />
+                  <label style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid var(--bg-primary)' }} title="Change photo">
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} disabled={profileSaving} />
+                    <span style={{ fontSize: 12 }}>📷</span>
+                  </label>
+                </div>
+                <div>
+                  <h2 style={{ margin: '0 0 4px' }}>{displayUser.name}</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 6px' }}>{displayUser.email}</p>
+                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 12, background: 'rgba(16,185,129,0.1)', color: 'var(--primary)', fontWeight: 600 }}>Patient Account</span>
+                </div>
+              </div>
+
+              {profileSaving && <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>Uploading photo...</p>}
+              {profileMsg && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 16, fontSize: 13, background: profileMsg.startsWith('Upload failed') ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: profileMsg.startsWith('Upload failed') ? '#f87171' : 'var(--primary)' }}>
+                  {profileMsg}
+                </div>
+              )}
+
+              {/* Profile details */}
+              {[
+                ['Full Name', displayUser.name],
+                ['Email', displayUser.email],
+                ['Phone', displayUser.phone || '—'],
+                ['Occupation', displayUser.medicalIntake?.occupation || '—'],
+                ['Work Exertion', displayUser.medicalIntake?.workExertion || '—'],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+                  <span style={{ fontSize: 14, color: 'var(--text-primary)' }}>{value}</span>
+                </div>
+              ))}
+
+              <div style={{ marginTop: 20 }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  To update your photo, click the 📷 icon on the avatar. Accepted formats: JPG, PNG, WebP (max 10 MB).
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Prescription Receipt Overlay */}
